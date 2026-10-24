@@ -55,10 +55,23 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-line/60 py-5">
-        <p className="mx-auto max-w-[1600px] px-6 font-mono text-[10px] uppercase tracking-[0.22em] text-sub/70 lg:px-12">
-          © {new Date().getFullYear()} {APP_NAME} · Powered by the public
-          JioSaavn API. Not affiliated.
-        </p>
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 lg:px-12">
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub/70">
+            © {new Date().getFullYear()} {APP_NAME} · Powered by the public
+            JioSaavn API. Not affiliated.
+          </p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub/70">
+            Developed by{" "}
+            <a
+              href="https://aevon-official.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sub/70 transition-colors hover:text-white"
+            >
+              AEVON
+            </a>
+          </p>
+        </div>
       </div>
     </footer>
   );
