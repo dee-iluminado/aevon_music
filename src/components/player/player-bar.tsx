@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ListPlus,
   ListMusic,
@@ -12,6 +12,7 @@ import {
   Shuffle,
   SkipBack,
   SkipForward,
+  Timer,
   Volume2,
   VolumeX,
   Volume1,
@@ -25,6 +26,7 @@ import { QueuePanel } from "@/components/player/queue-panel";
 import { LyricsPanel } from "@/components/player/lyrics-panel";
 import { usePlayer } from "@/stores/player-store";
 import { useProgress } from "@/stores/progress-store";
+import { useDominantColor } from "@/hooks/use-dominant-color";
 import { formatDuration, joinArtists, cn } from "@/lib/utils";
 
 export function PlayerBar() {
@@ -36,6 +38,8 @@ export function PlayerBar() {
   const muted = usePlayer((s) => s.muted);
   const queueOpen = usePlayer((s) => s.queueOpen);
   const lyricsOpen = usePlayer((s) => s.lyricsOpen);
+  const sleepTimer = usePlayer((s) => s.sleepTimer);
+  const setSleepTimer = usePlayer((s) => s.setSleepTimer);
 
   const togglePlay = usePlayer((s) => s.togglePlay);
   const next = usePlayer((s) => s.next);
@@ -52,8 +56,23 @@ export function PlayerBar() {
   const current = useProgress((s) => s.current);
   const duration = useProgress((s) => s.duration);
 
+  const dominantColor = useDominantColor(song?.image);
+
   const [npOpen, setNpOpen] = useState(false);
   const [scrub, setScrub] = useState<number | null>(null);
+  const [timerMenuOpen, setTimerMenuOpen] = useState(false);
+  const timerMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!timerMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (timerMenuRef.current && !timerMenuRef.current.contains(e.target as Node)) {
+        setTimerMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [timerMenuOpen]);
 
   if (!song) return null;
 
@@ -68,6 +87,7 @@ export function PlayerBar() {
           <div
             className="mm-dock-aurora pointer-events-none absolute inset-0"
             aria-hidden
+            style={{ background: `radial-gradient(ellipse 60% 40% at 50% 100%, rgb(${dominantColor}/.10), transparent)` }}
           />
           <div className="relative">
             {/* thin mobile progress line */}
@@ -189,6 +209,66 @@ export function PlayerBar() {
 
             {/* right: volume + panels (desktop) */}
             <div className="hidden shrink-0 items-center justify-end gap-1 md:flex md:w-[260px]">
+              <div className="relative" ref={timerMenuRef}>
+                <button
+                  aria-label="Sleep timer"
+                  onClick={() => setTimerMenuOpen((prev) => !prev)}
+                  className={cn(
+                    "relative flex h-8 w-8 items-center justify-center rounded-full transition",
+                    sleepTimer !== null ? "text-accent" : "text-zinc-500 hover:text-white"
+                  )}
+                >
+                  <Timer className="h-4.5 w-4.5" />
+                  {sleepTimer !== null && (
+                    <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-white shadow-sm">
+                      {sleepTimer}
+                    </span>
+                  )}
+                </button>
+
+                {timerMenuOpen && (
+                  <div className="absolute bottom-full right-0 mb-2 w-36 overflow-hidden rounded-xl border border-white/10 bg-panel/95 p-1 shadow-2xl backdrop-blur-xl z-50">
+                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                      Sleep Timer
+                    </div>
+                    {[15, 30, 45, 60].map((mins) => (
+                      <button
+                        key={mins}
+                        onClick={() => {
+                          setSleepTimer(mins);
+                          setTimerMenuOpen(false);
+                          toast.success(`Sleep timer set for ${mins} minutes`);
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition",
+                          sleepTimer === mins
+                            ? "bg-accent/15 text-accent font-medium"
+                            : "text-zinc-300 hover:bg-white/10 hover:text-white"
+                        )}
+                      >
+                        <span>{mins} min</span>
+                        {sleepTimer === mins && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
+                      </button>
+                    ))}
+                    <div className="my-1 border-t border-white/5" />
+                    <button
+                      onClick={() => {
+                        setSleepTimer(null);
+                        setTimerMenuOpen(false);
+                        if (sleepTimer !== null) toast.success("Sleep timer turned off");
+                      }}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition",
+                        sleepTimer === null
+                          ? "text-zinc-500 cursor-default"
+                          : "text-red-400 hover:bg-white/10 hover:text-red-300"
+                      )}
+                    >
+                      <span>Turn off</span>
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 aria-label="Toggle lyrics"
                 onClick={() => setLyricsOpen(!lyricsOpen)}

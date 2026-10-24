@@ -13,6 +13,7 @@ import {
   Play,
   Repeat,
   Repeat1,
+  Share2,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -28,6 +29,7 @@ import { useProgress } from "@/stores/progress-store";
 import { useLibrary } from "@/stores/library-store";
 import { useMounted } from "@/hooks/use-mounted";
 import { useLockBody } from "@/hooks/use-lock-body";
+import { useDominantColor } from "@/hooks/use-dominant-color";
 import { downloadSong } from "@/lib/download";
 import { formatDuration, joinArtists } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -48,6 +50,8 @@ export function NowPlayingSheet({
   const duration = useProgress((s) => s.duration);
   const mounted = useMounted();
 
+  const dominantColor = useDominantColor(song?.image);
+
   const st = usePlayer;
   const favs = useLibrary((s) => s.favourites);
   const toggleFav = useLibrary((s) => s.toggleFavourite);
@@ -62,6 +66,31 @@ export function NowPlayingSheet({
 
   useLockBody(open);
 
+  const handleShare = async () => {
+    if (!song) return;
+    const url = `${window.location.origin}/song/${encodeURIComponent(song.id)}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: song.title,
+          text: `Listen to ${song.title} on AEVON Music`,
+          url,
+        });
+        return;
+      } catch (err: unknown) {
+        if ((err as Error)?.name === "AbortError") return;
+      }
+    }
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link copied!");
+      } catch {
+        toast.error("Failed to copy link");
+      }
+    }
+  };
+
   return (
     <AnimatePresence>
       {open && song && (
@@ -69,6 +98,9 @@ export function NowPlayingSheet({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          style={{
+            background: `linear-gradient(180deg, rgb(${dominantColor}/.18) 0%, var(--color-bg) 45%)`,
+          }}
           className="fixed inset-0 z-[55] flex flex-col overflow-y-auto bg-bg/98 backdrop-blur-xl"
         >
           <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-6 pb-10 pt-4">
@@ -185,7 +217,8 @@ export function NowPlayingSheet({
               <button
                 aria-label={isPlaying ? "Pause" : "Play"}
                 onClick={st.getState().togglePlay}
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white shadow-[0_15px_40px_-10px_rgb(var(--ember-rgb)/.6)] transition hover:scale-105 active:scale-95"
+                style={{ boxShadow: `0 15px 40px -10px rgb(${dominantColor}/.55)` }}
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white transition hover:scale-105 active:scale-95"
               >
                 {isPlaying ? (
                   <Pause className="h-7 w-7 fill-current" />
@@ -233,6 +266,13 @@ export function NowPlayingSheet({
               >
                 <ListMusic className="h-5 w-5" />
                 <span className="text-[10px]">Queue</span>
+              </button>
+              <button
+                onClick={handleShare}
+                className="flex flex-col items-center gap-1.5 text-zinc-400 transition hover:text-white"
+              >
+                <Share2 className="h-5 w-5" />
+                <span className="text-[10px]">Share</span>
               </button>
               <button
                 onClick={() => void downloadSong(song)}

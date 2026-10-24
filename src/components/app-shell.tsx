@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
 import { Logo } from "@/components/logo";
 import { Footer } from "@/components/footer";
 import { PlaylistDialog } from "@/components/dialogs/playlist-dialog";
+import { ShortcutsDialog } from "@/components/dialogs/shortcuts-dialog";
+import { OfflineBanner } from "@/components/offline-banner";
 import { useLibrary } from "@/stores/library-store";
 import { useMounted } from "@/hooks/use-mounted";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [indicator, setIndicator] = useState({ left: 0, width: 0, opacity: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [prevPathname, setPrevPathname] = useState(pathname);
   const linkRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
   const navRef = useRef<HTMLDivElement>(null);
@@ -79,9 +82,23 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const typing =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        target?.isContentEditable;
+
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         router.push("/search");
+        return;
+      }
+
+      if (e.key === "?" && !typing) {
+        setShortcutsOpen((o) => !o);
+        return;
       }
     };
     window.addEventListener("keydown", onKey);
@@ -110,6 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative min-h-screen bg-bg">
+      <OfflineBanner />
       <header className="sticky top-0 z-40 px-4 pb-2 pt-4 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-[1600px] items-center justify-center">
           {/* Desktop pill */}
@@ -243,6 +261,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Footer />
 
       <PlaylistDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
+      <ShortcutsDialog
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
     </div>
   );
 }

@@ -17,6 +17,8 @@ interface PlayerState {
   queueOpen: boolean;
   lyricsOpen: boolean;
   usedProxyFor: string;
+  sleepTimer: number | null;
+  sleepTimerId: ReturnType<typeof setTimeout> | null;
 
   playQueue: (songs: Song[], startIndex?: number) => void;
   playNow: (song: Song, context?: Song[]) => void;
@@ -33,11 +35,13 @@ interface PlayerState {
   toggleAutoAdd: () => void;
   setQueueOpen: (open: boolean) => void;
   setLyricsOpen: (open: boolean) => void;
+  setSleepTimer: (minutes: number | null) => void;
   addNext: (song: Song) => void;
   addToQueue: (song: Song) => void;
   removeAt: (index: number) => void;
   clearQueue: () => void;
   setIndex: (index: number) => void;
+  reorderQueue: (newQueue: Song[]) => void;
 }
 
 function loadCurrent(autoplay = true) {
@@ -85,6 +89,8 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   queueOpen: false,
   lyricsOpen: false,
   usedProxyFor: "",
+  sleepTimer: null,
+  sleepTimerId: null,
 
   playQueue: (songs, startIndex = 0) => {
     if (!songs.length) return;
@@ -244,6 +250,20 @@ export const usePlayer = create<PlayerState>((set, get) => ({
 
   setQueueOpen: (open) => set({ queueOpen: open }),
   setLyricsOpen: (open) => set({ lyricsOpen: open }),
+  setSleepTimer: (minutes) => {
+    // Clear any existing timer
+    const { sleepTimerId } = get();
+    if (sleepTimerId !== null) clearTimeout(sleepTimerId);
+    if (minutes === null) {
+      set({ sleepTimer: null, sleepTimerId: null });
+      return;
+    }
+    const id = setTimeout(() => {
+      get().setPlaying(false);
+      set({ sleepTimer: null, sleepTimerId: null });
+    }, minutes * 60 * 1000);
+    set({ sleepTimer: minutes, sleepTimerId: id });
+  },
 
   addNext: (song) => {
     const { queue, currentIndex } = get();
@@ -320,6 +340,18 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     if (index < 0 || index >= queue.length) return;
     set({ currentIndex: index, isPlaying: true });
     loadCurrent();
+  },
+
+  reorderQueue: (newQueue) => {
+    const { queue, currentIndex } = get();
+    const currentSong = queue[currentIndex];
+    const newIndex = currentSong
+      ? newQueue.findIndex((s) => s.id === currentSong.id)
+      : currentIndex;
+    set({
+      queue: newQueue,
+      currentIndex: newIndex >= 0 ? newIndex : currentIndex,
+    });
   },
 }));
 

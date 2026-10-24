@@ -43,3 +43,5 @@ next-env.d.ts
 # local artifacts
 server.log
 *.log
+
+.vercel

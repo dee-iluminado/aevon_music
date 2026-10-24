@@ -1,0 +1,6 @@
+aevon-music-android/
+narrative-clips/
+node_modules/
+.next/
+.vercel/
+*.log
