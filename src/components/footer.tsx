@@ -66,7 +66,7 @@ export function Footer() {
               href="https://aevon-official.vercel.app/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sub/70 transition-colors hover:text-white"
+              className="transition-colors hover:text-white"
             >
               AEVON
             </a>
