@@ -1,7 +1,9 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { Song } from "@/lib/types";
 import { getAudio, mediaSrc, proxiedSrc } from "@/lib/audio";
 import { useProgress } from "@/stores/progress-store";
+import { useLibrary } from "@/stores/library-store";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -17,6 +19,13 @@ interface PlayerState {
   queueOpen: boolean;
   lyricsOpen: boolean;
   usedProxyFor: string;
+  /** Last known playhead position, used to resume after a reload. */
+  position: number;
+  positionId: string;
+  /** Sleep timer: absolute timestamp for "in N minutes", null otherwise. */
+  sleepAt: number | null;
+  sleepMode: "time" | "track" | null;
+  setSleep: (minutes: number | "track" | null) => void;
 
   playQueue: (songs: Song[], startIndex?: number) => void;
   playNow: (song: Song, context?: Song[]) => void;
@@ -36,6 +45,7 @@ interface PlayerState {
   addNext: (song: Song) => void;
   addToQueue: (song: Song) => void;
   removeAt: (index: number) => void;
+  move: (from: number, to: number) => void;
   clearQueue: () => void;
   setIndex: (index: number) => void;
 }
@@ -54,11 +64,21 @@ function loadCurrent(autoplay = true) {
     useProgress.getState().resetProgress();
     return;
   }
+  if (song && state.positionId !== song.id) {
+    // New track: forget the previous playhead so we start from zero.
+    usePlayer.setState({ position: 0, positionId: song.id });
+  }
   audio.src =
     usePlayer.getState().usedProxyFor === song.id
       ? proxiedSrc(src)
       : src;
+  audio.preload = autoplay ? "auto" : "metadata";
   audio.volume = usePlayer.getState().muted ? 0 : usePlayer.getState().volume;
+  if (autoplay && song) {
+    const library = useLibrary.getState();
+    library.pushRecent(song);
+    library.bumpPlay(song.id);
+  }
   if (!autoplay) {
     audio.pause();
     return;
@@ -73,18 +93,39 @@ function suggestIndex(songs: Song[], currentId?: string): number {
   return i >= 0 ? i : 0;
 }
 
-export const usePlayer = create<PlayerState>((set, get) => ({
-  queue: [],
-  currentIndex: -1,
-  isPlaying: false,
-  repeat: "off",
-  shuffle: false,
-  volume: 0.8,
-  muted: false,
-  autoAddSimilar: false,
-  queueOpen: false,
-  lyricsOpen: false,
-  usedProxyFor: "",
+export const usePlayer = create<PlayerState>()(
+  persist(
+    (set, get) => ({
+      queue: [],
+      currentIndex: -1,
+      isPlaying: false,
+      repeat: "off",
+      shuffle: false,
+      volume: 0.8,
+      muted: false,
+      autoAddSimilar: false,
+      queueOpen: false,
+      lyricsOpen: false,
+      usedProxyFor: "",
+      position: 0,
+      positionId: "",
+      sleepAt: null,
+      sleepMode: null,
+
+      setSleep: (minutes) => {
+        if (minutes === null) {
+          set({ sleepAt: null, sleepMode: null });
+          return;
+        }
+        if (minutes === "track") {
+          set({ sleepAt: null, sleepMode: "track" });
+          return;
+        }
+        set({
+          sleepAt: Date.now() + minutes * 60_000,
+          sleepMode: "time",
+        });
+      },
 
   playQueue: (songs, startIndex = 0) => {
     if (!songs.length) return;
@@ -103,8 +144,10 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     set({ isPlaying: playing });
     const audio = getAudio();
     if (!audio) return;
-    if (playing) audio.play().catch(() => set({ isPlaying: false }));
-    else audio.pause();
+    if (playing) {
+      audio.preload = "auto";
+      audio.play().catch(() => set({ isPlaying: false }));
+    } else audio.pause();
   },
 
   togglePlay: () => {
@@ -174,7 +217,19 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   },
 
   handleEnded: () => {
-    const { repeat, currentIndex, queue, autoAddSimilar } = get();
+    const { repeat, currentIndex, queue, autoAddSimilar, sleepMode } = get();
+    if (sleepMode === "track") {
+      // Sleep timer set to "end of track": stop here instead of advancing.
+      const audio = getAudio();
+      if (audio) audio.pause();
+      set({ isPlaying: false, sleepMode: null, sleepAt: null });
+      useProgress.getState().setProgress(
+        useProgress.getState().duration,
+        useProgress.getState().duration,
+        0
+      );
+      return;
+    }
     if (repeat === "one") {
       const audio = getAudio();
       if (audio) {
@@ -305,6 +360,29 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     if (index === currentIndex) loadCurrent(get().isPlaying);
   },
 
+  move: (from, to) => {
+    const { queue, currentIndex } = get();
+    if (
+      from === to ||
+      from < 0 ||
+      to < 0 ||
+      from >= queue.length ||
+      to >= queue.length
+    ) {
+      return;
+    }
+    const copy = [...queue];
+    const [item] = copy.splice(from, 1);
+    copy.splice(to, 0, item);
+
+    let ci = currentIndex;
+    if (from === currentIndex) ci = to;
+    else if (from < currentIndex && to >= currentIndex) ci = currentIndex - 1;
+    else if (from > currentIndex && to <= currentIndex) ci = currentIndex + 1;
+
+    set({ queue: copy, currentIndex: ci });
+  },
+
   clearQueue: () => {
     const audio = getAudio();
     if (audio) {
@@ -312,7 +390,16 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       audio.removeAttribute("src");
     }
     useProgress.getState().resetProgress();
-    set({ queue: [], currentIndex: -1, isPlaying: false, usedProxyFor: "" });
+    set({
+      queue: [],
+      currentIndex: -1,
+      isPlaying: false,
+      usedProxyFor: "",
+      position: 0,
+      positionId: "",
+      sleepAt: null,
+      sleepMode: null,
+    });
   },
 
   setIndex: (index) => {
@@ -321,7 +408,38 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     set({ currentIndex: index, isPlaying: true });
     loadCurrent();
   },
-}));
+    }),
+    {
+      name: "aevon-player-v1",
+      version: 1,
+      storage: createJSONStorage(() => localStorage),
+      // Keep the user's session across reloads, but never persist transient UI
+      // state or a stale "playing" flag (nothing is playing right after load).
+      partialize: (state) => ({
+        queue: state.queue.slice(0, 120),
+        currentIndex: Math.min(state.currentIndex, Math.min(state.queue.length, 120) - 1),
+        repeat: state.repeat,
+        shuffle: state.shuffle,
+        volume: state.volume,
+        muted: state.muted,
+        autoAddSimilar: state.autoAddSimilar,
+        position: state.position,
+        positionId: state.positionId,
+      }),
+    }
+  )
+);
+
+/**
+ * Rebuilds the player after a reload: restores the queue and playhead but
+ * stays paused so the browser never starts audio without a gesture.
+ */
+export function restoreSession() {
+  const st = usePlayer.getState();
+  if (!st.queue.length) return;
+  if (st.currentIndex < 0 || st.currentIndex >= st.queue.length) return;
+  loadCurrent(false);
+}
 
 /**
  * Appends similar-song suggestions to the end of the queue (never skips the

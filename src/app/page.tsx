@@ -5,6 +5,8 @@ import { PlaylistCard } from "@/components/cards/playlist-card";
 import { AlbumCard } from "@/components/cards/album-card";
 import { SongCardSkeleton } from "@/components/ui/skeleton";
 import { LikedSongsCard } from "@/components/home/liked-songs-card";
+import { RecentlyPlayedSection } from "@/components/home/recently-played-section";
+import { ForYouSection } from "@/components/home/for-you-section";
 import {
   getEnglishHomeSongs,
   safe,
@@ -35,6 +37,9 @@ export default async function HomePage() {
   return (
     <div className="space-y-14 pb-6">
       <LikedSongsCard />
+
+      <ForYouSection />
+      <RecentlyPlayedSection />
 
       {loading ? (
         <div className="space-y-12">

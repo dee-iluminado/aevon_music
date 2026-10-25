@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   Play,
   Plus,
+  Share2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +24,7 @@ import { useLibrary } from "@/stores/library-store";
 import { useLockBody } from "@/hooks/use-lock-body";
 import { useMounted } from "@/hooks/use-mounted";
 import { downloadSong } from "@/lib/download";
+import { shareLink } from "@/lib/share";
 import { joinArtists } from "@/lib/utils";
 import type { Song } from "@/lib/types";
 
@@ -232,6 +234,19 @@ export function SongMenu({ song, context, size = "md", className }: SongMenuProp
                     className={itemClass}
                   >
                     <Download className="h-4.5 w-4.5" /> Download
+                  </button>
+                  <button
+                    onClick={() => {
+                      void shareLink({
+                        title: `${song.title} — ${joinArtists(song.artists)}`,
+                        text: `Listen to ${song.title} on AEVON Music`,
+                        url: `/song/${song.id}`,
+                      });
+                      close();
+                    }}
+                    className={itemClass}
+                  >
+                    <Share2 className="h-4.5 w-4.5" /> Share song
                   </button>
                   <div className="my-1 h-px bg-white/8" />
                   <Link

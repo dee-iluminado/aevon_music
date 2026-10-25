@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ListMusic } from "lucide-react";
 import { Cover } from "@/components/cover";
 import { PlayAll } from "@/components/detail/play-all";
+import { detailPill } from "@/components/detail/entity-buttons";
+import { ShareButton } from "@/components/share-button";
 import { SongRow } from "@/components/song-row";
 import { getPlaylist, safe } from "@/lib/api";
 import { formatCount, formatDuration } from "@/lib/utils";
@@ -89,8 +91,15 @@ export default async function PlaylistPage({
             ) : null}
             {playlist.language && <span>{playlist.language}</span>}
           </p>
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             <PlayAll songs={songs} label="Play playlist" />
+            <ShareButton
+              path={`/playlist/${playlist.id}`}
+              title={playlist.name}
+              text={`Listen to ${playlist.name} on AEVON Music`}
+              label="Share"
+              className={detailPill}
+            />
           </div>
         </div>
       </div>

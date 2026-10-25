@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Disc3 } from "lucide-react";
 import { Cover } from "@/components/cover";
 import { PlayAll } from "@/components/detail/play-all";
+import { SaveAlbumButton, detailPill } from "@/components/detail/entity-buttons";
+import { ShareButton } from "@/components/share-button";
 import { SongRow } from "@/components/song-row";
 import { getAlbum, safe } from "@/lib/api";
 import { formatDuration, joinArtists } from "@/lib/utils";
@@ -89,8 +91,16 @@ export default async function AlbumPage({
               {album.description}
             </p>
           )}
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             <PlayAll songs={songs} label="Play album" />
+            <SaveAlbumButton album={album} />
+            <ShareButton
+              path={`/album/${album.id}`}
+              title={album.name}
+              text={`Listen to ${album.name} on AEVON Music`}
+              label="Share"
+              className={detailPill}
+            />
           </div>
         </div>
       </div>

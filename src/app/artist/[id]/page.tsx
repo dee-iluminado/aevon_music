@@ -6,6 +6,8 @@ import { Section } from "@/components/section";
 import { SongRow } from "@/components/song-row";
 import { AlbumCard } from "@/components/cards/album-card";
 import { PlayAll } from "@/components/detail/play-all";
+import { FollowArtistButton, detailPill } from "@/components/detail/entity-buttons";
+import { ShareButton } from "@/components/share-button";
 import {
   getArtist,
   getArtistAlbums,
@@ -87,8 +89,16 @@ export default async function ArtistPage({
             <span>{songs.length} songs</span>
             {albums.length > 0 && <span>{albums.length} albums</span>}
           </p>
-          <div className="mt-6 flex justify-center sm:justify-start">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
             <PlayAll songs={songs} label="Play top songs" />
+            <FollowArtistButton artist={artist} />
+            <ShareButton
+              path={`/artist/${artist.id}`}
+              title={artist.name}
+              text={`Listen to ${artist.name} on AEVON Music`}
+              label="Share"
+              className={detailPill}
+            />
           </div>
         </div>
       </div>

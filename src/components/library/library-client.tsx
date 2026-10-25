@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Heart, ListMusic, Plus, Clock } from "lucide-react";
+import { BarChart3, Disc3, Heart, ListMusic, Mic2, Plus, Clock } from "lucide-react";
+import { Cover } from "@/components/cover";
 import { SongRow } from "@/components/song-row";
 import { PlaylistDialog } from "@/components/dialogs/playlist-dialog";
 import { useLibrary } from "@/stores/library-store";
 import { useMounted } from "@/hooks/use-mounted";
 import { formatDuration } from "@/lib/utils";
+import type { Song } from "@/lib/types";
 
 export function LibraryClient() {
   const mounted = useMounted();
@@ -15,6 +17,32 @@ export function LibraryClient() {
   const favourites = useLibrary((s) => s.favourites);
   const playlists = useLibrary((s) => s.playlists);
   const recent = useLibrary((s) => s.recentlyPlayed);
+  const albums = useLibrary((s) => s.albums);
+  const artists = useLibrary((s) => s.artists);
+  const playCounts = useLibrary((s) => s.playCounts);
+
+  const stats = useMemo(() => {
+    const byId = new Map<string, Song>();
+    for (const song of [
+      ...favourites,
+      ...recent,
+      ...playlists.flatMap((p) => p.songs),
+    ]) {
+      if (!byId.has(song.id)) byId.set(song.id, song);
+    }
+
+    const entries = Object.entries(playCounts)
+      .filter(([id]) => byId.has(id))
+      .sort((a, b) => b[1] - a[1]);
+
+    return {
+      totalPlays: Object.values(playCounts).reduce((sum, n) => sum + n, 0),
+      uniqueTracks: Object.keys(playCounts).length,
+      top: entries
+        .slice(0, 5)
+        .map(([id, count]) => ({ song: byId.get(id) as Song, count })),
+    };
+  }, [favourites, recent, playlists, playCounts]);
 
   if (!mounted) return null;
 
@@ -105,6 +133,125 @@ export function LibraryClient() {
           </div>
         )}
       </section>
+
+      {albums.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="flex items-center gap-2 font-heading text-xl font-semibold text-fg sm:text-2xl">
+            <Disc3 className="h-5 w-5 text-accent" />
+            Saved albums
+            <span className="text-sm font-normal text-zinc-500">
+              {albums.length}
+            </span>
+          </h2>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {albums.map((album) => (
+              <Link
+                key={album.id}
+                href={`/album/${album.id}`}
+                className="group block"
+              >
+                <div className="relative aspect-square overflow-hidden rounded-xl border border-line/60 bg-panel">
+                  <Cover
+                    src={album.image}
+                    alt={album.name}
+                    className="absolute inset-0 transition duration-300 group-hover:scale-[1.03]"
+                  />
+                </div>
+                <p className="mt-2 truncate text-sm font-medium text-fg group-hover:text-accent">
+                  {album.name}
+                </p>
+                <p className="truncate text-xs text-sub">
+                  {album.artists.join(", ")}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {artists.length > 0 && (
+        <section className="space-y-4">
+          <h2 className="flex items-center gap-2 font-heading text-xl font-semibold text-fg sm:text-2xl">
+            <Mic2 className="h-5 w-5 text-accent" />
+            Artists you follow
+            <span className="text-sm font-normal text-zinc-500">
+              {artists.length}
+            </span>
+          </h2>
+          <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+            {artists.map((artist) => (
+              <Link
+                key={artist.id}
+                href={`/artist/${artist.id}`}
+                className="group flex flex-col items-center text-center"
+              >
+                <div className="relative aspect-square w-full overflow-hidden rounded-full border border-line/60 bg-panel">
+                  <Cover
+                    src={artist.image}
+                    alt={artist.name}
+                    className="absolute inset-0 transition duration-300 group-hover:scale-[1.03]"
+                  />
+                </div>
+                <p className="mt-2 w-full truncate text-sm font-medium text-fg group-hover:text-accent">
+                  {artist.name}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {stats.totalPlays > 0 && (
+        <section className="space-y-4">
+          <h2 className="flex items-center gap-2 font-heading text-xl font-semibold text-fg sm:text-2xl">
+            <BarChart3 className="h-5 w-5 text-accent" />
+            Listening stats
+          </h2>
+          <div className="grid gap-4 rounded-2xl border border-line/70 bg-panel/60 p-5 sm:grid-cols-[auto_1fr] sm:gap-8">
+            <div className="flex gap-8 sm:flex-col sm:gap-4">
+              <div>
+                <p className="font-heading text-2xl font-semibold text-fg">
+                  {stats.totalPlays.toLocaleString()}
+                </p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-sub">
+                  Plays
+                </p>
+              </div>
+              <div>
+                <p className="font-heading text-2xl font-semibold text-fg">
+                  {stats.uniqueTracks.toLocaleString()}
+                </p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-sub">
+                  Tracks
+                </p>
+              </div>
+            </div>
+            {stats.top.length > 0 && (
+              <div className="min-w-0 space-y-1.5">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-sub">
+                  Most played
+                </p>
+                {stats.top.map(({ song, count }, i) => (
+                  <div key={song.id} className="flex items-center gap-3">
+                    <span className="w-4 shrink-0 text-right font-mono text-xs text-dim">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-fg">{song.title}</p>
+                      <p className="truncate text-xs text-sub">
+                        {song.artists.join(", ")}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-sub">
+                      {count}×
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {recent.length > 0 && (
         <section className="space-y-4">

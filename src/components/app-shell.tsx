@@ -20,6 +20,12 @@ const NAV_ITEMS = [
     match: (p: string) => p === "/",
   },
   {
+    key: "browse",
+    label: "Browse",
+    href: "/browse",
+    match: (p: string) => p.startsWith("/browse"),
+  },
+  {
     key: "library",
     label: "Favourites",
     href: "/library",

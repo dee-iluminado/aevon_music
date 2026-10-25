@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ListMusic, Sparkles, Trash2, X } from "lucide-react";
+import { GripVertical, ListMusic, Sparkles, Trash2, X } from "lucide-react";
 import { Cover } from "@/components/cover";
 import { PlayingBars } from "@/components/play-button";
 import { usePlayer } from "@/stores/player-store";
@@ -20,8 +20,44 @@ export function QueuePanel() {
   const clearQueue = usePlayer((s) => s.clearQueue);
   const autoAdd = usePlayer((s) => s.autoAddSimilar);
   const toggleAutoAdd = usePlayer((s) => s.toggleAutoAdd);
+  const move = usePlayer((s) => s.move);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dropAt, setDropAt] = useState<number | null>(null);
 
   useLockBody(open);
+
+  // Escape closes the panel and drag state never lingers across opens.
+  useEffect(() => {
+    if (!open) {
+      setDragFrom(null);
+      setDropAt(null);
+    }
+  }, [open]);
+
+  /** Returns the insertion slot (0..length) for a pointer Y coordinate. */
+  const slotAt = (clientY: number) => {
+    const rows = listRef.current?.querySelectorAll<HTMLElement>(
+      "[data-queue-row]"
+    );
+    if (!rows) return 0;
+    for (let i = 0; i < rows.length; i++) {
+      const rect = rows[i].getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) return i;
+    }
+    return rows.length;
+  };
+
+  const commitDrop = () => {
+    if (dragFrom !== null && dropAt !== null) {
+      // `move` inserts after removal, so the slot shifts when moving down.
+      const to = dropAt > dragFrom ? dropAt - 1 : dropAt;
+      if (to !== dragFrom) move(dragFrom, to);
+    }
+    setDragFrom(null);
+    setDropAt(null);
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -78,52 +114,105 @@ export function QueuePanel() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-0.5">
+                <div ref={listRef} className="space-y-0.5">
                   {queue.map((song, i) => {
                     const active = i === currentIndex;
+                    const dragging = dragFrom === i;
+                    const showLine = dragFrom !== null && dropAt === i;
                     return (
-                      <div
-                        key={`${song.id}-${i}`}
-                        onClick={() => setIndex(i)}
-                        className={cn(
-                          "group flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/5",
-                          active && "bg-white/5"
+                      <div key={`${song.id}-${i}`} className="relative">
+                        {showLine && (
+                          <span
+                            aria-hidden
+                            className="pointer-events-none absolute -top-0.5 left-2 right-2 z-10 h-0.5 rounded-full bg-accent"
+                          />
                         )}
-                      >
-                        <div className="relative w-10 shrink-0">
-                          <Cover src={song.image} alt={song.title} className="aspect-square rounded-md" />
-                          {active && isPlaying && (
-                            <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/50">
-                              <PlayingBars className="h-3.5" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className={cn(
-                              "truncate text-sm font-medium",
-                              active ? "text-accent" : "text-zinc-200"
-                            )}
-                          >
-                            {song.title}
-                          </p>
-                          <p className="truncate text-xs text-zinc-500">
-                            {song.artists.join(", ") || song.album}
-                          </p>
-                        </div>
-                        <button
-                          aria-label="Remove from queue"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeAt(i);
+                        <div
+                          data-queue-row
+                          onClick={() => {
+                            if (dragFrom === null) setIndex(i);
                           }}
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-600 opacity-0 transition hover:text-white group-hover:opacity-100"
+                          className={cn(
+                            "group flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-white/5",
+                            active && "bg-white/5",
+                            dragging && "opacity-40"
+                          )}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                          <button
+                            type="button"
+                            aria-label={`Reorder ${song.title}`}
+                            title="Drag to reorder"
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.currentTarget.setPointerCapture(e.pointerId);
+                              setDragFrom(i);
+                              setDropAt(i);
+                            }}
+                            onPointerMove={(e) => {
+                              if (dragFrom === null) return;
+                              setDropAt(slotAt(e.clientY));
+                            }}
+                            onPointerUp={commitDrop}
+                            onPointerCancel={() => {
+                              setDragFrom(null);
+                              setDropAt(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "ArrowUp" && i > 0) {
+                                e.preventDefault();
+                                move(i, i - 1);
+                              }
+                              if (e.key === "ArrowDown" && i < queue.length - 1) {
+                                e.preventDefault();
+                                move(i, i + 1);
+                              }
+                            }}
+                            className="flex h-7 w-5 shrink-0 cursor-grab touch-none items-center justify-center rounded text-zinc-600 transition hover:text-white active:cursor-grabbing"
+                          >
+                            <GripVertical className="h-4 w-4" />
+                          </button>
+                          <div className="relative w-10 shrink-0">
+                            <Cover src={song.image} alt={song.title} className="aspect-square rounded-md" />
+                            {active && isPlaying && (
+                              <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/50">
+                                <PlayingBars className="h-3.5" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={cn(
+                                "truncate text-sm font-medium",
+                                active ? "text-accent" : "text-zinc-200"
+                              )}
+                            >
+                              {song.title}
+                            </p>
+                            <p className="truncate text-xs text-zinc-500">
+                              {song.artists.join(", ") || song.album}
+                            </p>
+                          </div>
+                          <button
+                            aria-label="Remove from queue"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeAt(i);
+                            }}
+                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-600 opacity-0 transition hover:text-white group-hover:opacity-100"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
+                  {dragFrom !== null && dropAt === queue.length && (
+                    <span
+                      aria-hidden
+                      className="mx-2 block h-0.5 rounded-full bg-accent"
+                    />
+                  )}
                 </div>
               )}
             </div>

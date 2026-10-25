@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Search, SearchX } from "lucide-react";
+import { Loader2, Search, SearchX, X } from "lucide-react";
 import { SongRow } from "@/components/song-row";
 import { AlbumCardGrid } from "@/components/cards/album-card";
 import { PlaylistCard } from "@/components/cards/playlist-card";
 import { ArtistCard } from "@/components/cards/artist-card";
 import { RowSkeleton, SongCardSkeleton } from "@/components/ui/skeleton";
+import { useMounted } from "@/hooks/use-mounted";
+import { useSearchHistory } from "@/stores/search-store";
 import { QUICK_SEARCHES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Album, ArtistInfo, Playlist, Song } from "@/lib/types";
@@ -42,8 +44,14 @@ function isTab(value: string | null): value is Tab {
 export function SearchClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const mounted = useMounted();
   const urlQuery = searchParams.get("q") ?? "";
   const urlTab = searchParams.get("type");
+
+  const recent = useSearchHistory((s) => s.recent);
+  const addRecent = useSearchHistory((s) => s.addRecent);
+  const removeRecent = useSearchHistory((s) => s.removeRecent);
+  const clearRecent = useSearchHistory((s) => s.clearRecent);
 
   const [query, setQuery] = useState(urlQuery);
   const [debounced, setDebounced] = useState(urlQuery);
@@ -91,7 +99,14 @@ export function SearchClient() {
         return res.json() as Promise<Results>;
       })
       .then((data) => {
-        if (!cancelled) setState({ q: debounced, tab, results: data, error: false });
+        if (!cancelled) {
+          setState({ q: debounced, tab, results: data, error: false });
+          const count = Object.values(data as Results).reduce(
+            (total, list) => total + (Array.isArray(list) ? list.length : 0),
+            0
+          );
+          if (count > 0) addRecent(debounced);
+        }
       })
       .catch(() => {
         if (!cancelled) setState({ q: debounced, tab, results: null, error: true });
@@ -155,20 +170,57 @@ export function SearchClient() {
       </div>
 
       {!debounced && (
-        <div className="space-y-3">
-          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub">
-            Try searching for
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_SEARCHES.map((s) => (
-              <button
-                key={s}
-                onClick={() => setQuery(s)}
-                className="rounded-full border border-line bg-panel-2/80 px-4 py-1.5 text-sm text-fg/80 transition hover:border-accent/40 hover:bg-accent/10 hover:text-accent"
-              >
-                {s}
-              </button>
-            ))}
+        <div className="space-y-6">
+          {mounted && recent.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub">
+                  Recent searches
+                </p>
+                <button
+                  onClick={clearRecent}
+                  className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub transition hover:text-fg"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {recent.map((q) => (
+                  <span
+                    key={q}
+                    className="group inline-flex items-center gap-1 rounded-full border border-line bg-panel-2/80 pl-4 pr-1.5 text-sm text-fg/80 transition hover:border-accent/40 hover:bg-accent/10 hover:text-accent"
+                  >
+                    <button onClick={() => setQuery(q)} className="py-1.5">
+                      {q}
+                    </button>
+                    <button
+                      onClick={() => removeRecent(q)}
+                      aria-label={`Remove ${q} from recent searches`}
+                      className="flex h-5 w-5 items-center justify-center rounded-full text-sub transition hover:bg-white/10 hover:text-fg"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub">
+              Try searching for
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_SEARCHES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setQuery(s)}
+                  className="rounded-full border border-line bg-panel-2/80 px-4 py-1.5 text-sm text-fg/80 transition hover:border-accent/40 hover:bg-accent/10 hover:text-accent"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -22,6 +22,8 @@ import {
 import { toast } from "sonner";
 import { Cover } from "@/components/cover";
 import { LyricsView } from "@/components/player/lyrics-view";
+import { SleepTimer } from "@/components/player/sleep-timer";
+import { ShareButton } from "@/components/share-button";
 import { Slider } from "@/components/ui/slider";
 import { usePlayer } from "@/stores/player-store";
 import { useProgress } from "@/stores/progress-store";
@@ -216,10 +218,10 @@ export function NowPlayingSheet({
               </button>
             </div>
 
-            <div className="mt-8 flex items-center justify-center gap-4">
+            <div className="mt-8 flex items-center justify-between gap-1 px-1">
               <button
                 onClick={() => setView("lyrics")}
-                className="flex flex-col items-center gap-1.5 text-zinc-400 transition hover:text-white"
+                className="flex w-12 flex-col items-center gap-1.5 text-zinc-400 transition hover:text-white"
               >
                 <Music2 className="h-5 w-5" />
                 <span className="text-[10px]">Lyrics</span>
@@ -229,14 +231,14 @@ export function NowPlayingSheet({
                   st.getState().setQueueOpen(true);
                   onClose();
                 }}
-                className="flex flex-col items-center gap-1.5 text-zinc-400 transition hover:text-white"
+                className="flex w-12 flex-col items-center gap-1.5 text-zinc-400 transition hover:text-white"
               >
                 <ListMusic className="h-5 w-5" />
                 <span className="text-[10px]">Queue</span>
               </button>
               <button
                 onClick={() => void downloadSong(song)}
-                className="flex flex-col items-center gap-1.5 text-zinc-400 transition hover:text-white"
+                className="flex w-12 flex-col items-center gap-1.5 text-zinc-400 transition hover:text-white"
               >
                 <Download className="h-5 w-5" />
                 <span className="text-[10px]">Download</span>
@@ -244,13 +246,23 @@ export function NowPlayingSheet({
               <button
                 onClick={st.getState().toggleAutoAdd}
                 className={cn(
-                  "flex flex-col items-center gap-1.5 transition",
+                  "flex w-12 flex-col items-center gap-1.5 transition",
                   autoAdd ? "text-accent" : "text-zinc-400 hover:text-white"
                 )}
               >
                 <Sparkles className="h-5 w-5" />
                 <span className="text-[10px]">Similar</span>
               </button>
+              <SleepTimer variant="action" />
+              <ShareButton
+                path={`/song/${song.id}`}
+                title={`${song.title} — ${joinArtists(song.artists)}`}
+                text={`Listen to ${song.title} on AEVON Music`}
+                label="Share"
+                labelClassName="text-[10px]"
+                className="w-12 flex-col gap-1.5 text-zinc-400 hover:text-white"
+                iconClassName="h-5 w-5"
+              />
             </div>
               </>
             )}

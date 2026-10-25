@@ -2,10 +2,11 @@
 
 import { Download, Heart } from "lucide-react";
 import { SongMenu } from "@/components/menus/song-menu";
+import { ShareButton } from "@/components/share-button";
 import { useLibrary } from "@/stores/library-store";
 import { useMounted } from "@/hooks/use-mounted";
 import { downloadSong } from "@/lib/download";
-import { cn } from "@/lib/utils";
+import { cn, joinArtists } from "@/lib/utils";
 import type { Song } from "@/lib/types";
 
 interface SongActionsProps {
@@ -41,6 +42,13 @@ export function SongActions({ song, context }: SongActionsProps) {
         <Download className="h-4.5 w-4.5" />
         Download
       </button>
+      <ShareButton
+        path={`/song/${song.id}`}
+        title={`${song.title} — ${joinArtists(song.artists)}`}
+        text={`Listen to ${song.title} on AEVON Music`}
+        label="Share"
+        className={pill}
+      />
       <SongMenu song={song} context={context} size="md" className="h-10 w-10 rounded-full border border-white/15 text-zinc-200 transition hover:border-white/30 hover:bg-white/5" />
     </div>
   );

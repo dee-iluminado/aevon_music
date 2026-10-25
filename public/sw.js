@@ -6,7 +6,7 @@
  *  - page navigations                                 -> network-first, cached copy offline
  *  - /api/*, audio streams, Range requests, cross-origin -> always network
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `aevon-shell-${VERSION}`;
 const STATIC_CACHE = `aevon-static-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
@@ -72,8 +72,16 @@ self.addEventListener("fetch", (event) => {
         try {
           const response = await fetch(request);
           if (response.ok) {
-            const cache = await caches.open(SHELL_CACHE);
-            cache.put(request, response.clone());
+            // Store the finished response in the background. Cloning a still
+            // streaming document can otherwise leave a blank/skeleton copy in
+            // the cache for offline use.
+            const copy = response.clone();
+            event.waitUntil(
+              caches
+                .open(SHELL_CACHE)
+                .then((cache) => cache.put(request, copy))
+                .catch(() => {})
+            );
           }
           return response;
         } catch {

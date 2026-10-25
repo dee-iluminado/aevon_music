@@ -23,6 +23,7 @@ import { Slider } from "@/components/ui/slider";
 import { NowPlayingSheet } from "@/components/player/now-playing-sheet";
 import { QueuePanel } from "@/components/player/queue-panel";
 import { LyricsPanel } from "@/components/player/lyrics-panel";
+import { SleepTimer } from "@/components/player/sleep-timer";
 import { usePlayer } from "@/stores/player-store";
 import { useProgress } from "@/stores/progress-store";
 import { formatDuration, joinArtists, cn } from "@/lib/utils";
@@ -189,6 +190,7 @@ export function PlayerBar() {
 
             {/* right: volume + panels (desktop) */}
             <div className="hidden shrink-0 items-center justify-end gap-1 md:flex md:w-[260px]">
+              <SleepTimer />
               <button
                 aria-label="Toggle lyrics"
                 onClick={() => setLyricsOpen(!lyricsOpen)}

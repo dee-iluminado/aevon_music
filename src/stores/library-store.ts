@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { Song } from "@/lib/types";
+import type { Album, ArtistInfo, Song } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
 export interface UserPlaylist {
@@ -16,6 +16,9 @@ interface LibraryState {
   playlists: UserPlaylist[];
   downloads: Song[];
   recentlyPlayed: Song[];
+  albums: Album[];
+  artists: ArtistInfo[];
+  playCounts: Record<string, number>;
 
   toggleFavourite: (song: Song) => void;
   isFavourite: (id: string) => boolean;
@@ -30,6 +33,11 @@ interface LibraryState {
   addDownload: (song: Song) => void;
   removeDownload: (songId: string) => void;
   pushRecent: (song: Song) => void;
+  bumpPlay: (songId: string) => void;
+  toggleAlbum: (album: Album) => void;
+  isAlbumSaved: (id: string) => boolean;
+  toggleArtist: (artist: ArtistInfo) => void;
+  isArtistFollowed: (id: string) => boolean;
 }
 
 export const useLibrary = create<LibraryState>()(
@@ -39,6 +47,9 @@ export const useLibrary = create<LibraryState>()(
       playlists: [],
       downloads: [],
       recentlyPlayed: [],
+      albums: [],
+      artists: [],
+      playCounts: {},
 
       toggleFavourite: (song) => {
         const { favourites } = get();
@@ -110,11 +121,50 @@ export const useLibrary = create<LibraryState>()(
         const rest = get().recentlyPlayed.filter((s) => s.id !== song.id);
         set({ recentlyPlayed: [song, ...rest].slice(0, 50) });
       },
+
+      bumpPlay: (songId) => {
+        const counts = get().playCounts;
+        set({ playCounts: { ...counts, [songId]: (counts[songId] ?? 0) + 1 } });
+      },
+
+      toggleAlbum: (album) => {
+        const exists = get().albums.some((a) => a.id === album.id);
+        set({
+          albums: exists
+            ? get().albums.filter((a) => a.id !== album.id)
+            : [{ ...album, songs: undefined }, ...get().albums],
+        });
+      },
+
+      isAlbumSaved: (id) => get().albums.some((a) => a.id === id),
+
+      toggleArtist: (artist) => {
+        const exists = get().artists.some((a) => a.id === artist.id);
+        set({
+          artists: exists
+            ? get().artists.filter((a) => a.id !== artist.id)
+            : [artist, ...get().artists],
+        });
+      },
+
+      isArtistFollowed: (id) => get().artists.some((a) => a.id === id),
     }),
     {
       name: "hayasaka-library-v1",
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Partial<LibraryState>;
+        if (version < 2) {
+          return {
+            ...state,
+            albums: state.albums ?? [],
+            artists: state.artists ?? [],
+            playCounts: state.playCounts ?? {},
+          } as LibraryState;
+        }
+        return state as LibraryState;
+      },
     }
   )
 );
