@@ -9,14 +9,12 @@ import { SongCard } from "@/components/cards/song-card";
 export function TopTracksSection() {
   const mounted = useMounted();
   const recentlyPlayed = useLibrary((s) => s.recentlyPlayed);
-  const playCounts = useLibrary((s) => s.playCounts);
 
   const topTracks = useMemo(() => {
     return [...recentlyPlayed]
-      .filter((s) => playCounts?.[s.id])
-      .sort((a, b) => (playCounts?.[b.id] ?? 0) - (playCounts?.[a.id] ?? 0))
+      .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
       .slice(0, 14);
-  }, [recentlyPlayed, playCounts]);
+  }, [recentlyPlayed]);
 
   if (!mounted || topTracks.length < 3) return null;
   return (

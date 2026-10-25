@@ -1,87 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion, Reorder, useDragControls } from "framer-motion";
-import { GripVertical, ListMusic, Sparkles, Trash2, X } from "lucide-react";
+import { useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ListMusic, Sparkles, Trash2, X } from "lucide-react";
 import { Cover } from "@/components/cover";
 import { PlayingBars } from "@/components/play-button";
 import { usePlayer } from "@/stores/player-store";
 import { useLockBody } from "@/hooks/use-lock-body";
 import { cn } from "@/lib/utils";
-import type { Song } from "@/lib/types";
-
-interface QueueItemProps {
-  song: Song;
-  index: number;
-  active: boolean;
-  isPlaying: boolean;
-  onSelect: () => void;
-  onRemove: () => void;
-}
-
-function QueueItem({
-  song,
-  index,
-  active,
-  isPlaying,
-  onSelect,
-  onRemove,
-}: QueueItemProps) {
-  const dragControls = useDragControls();
-
-  return (
-    <Reorder.Item
-      value={song}
-      dragListener={false}
-      dragControls={dragControls}
-      onClick={onSelect}
-      className={cn(
-        "group flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-white/5 select-none",
-        active && "bg-white/5"
-      )}
-    >
-      <div
-        className="drag-handle flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-zinc-600 opacity-60 transition group-hover:opacity-100 active:cursor-grabbing hover:text-zinc-300 sm:opacity-0"
-        onPointerDown={(e) => dragControls.start(e)}
-        onClick={(e) => e.stopPropagation()}
-        title="Drag to reorder"
-      >
-        <GripVertical className="h-4 w-4" />
-      </div>
-      <div className="relative w-10 shrink-0">
-        <Cover src={song.image} alt={song.title} className="aspect-square rounded-md" />
-        {active && isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/50">
-            <PlayingBars className="h-3.5" />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p
-          className={cn(
-            "truncate text-sm font-medium",
-            active ? "text-accent" : "text-zinc-200"
-          )}
-        >
-          {song.title}
-        </p>
-        <p className="truncate text-xs text-zinc-500">
-          {song.artists.join(", ") || song.album}
-        </p>
-      </div>
-      <button
-        aria-label="Remove from queue"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-600 opacity-0 transition hover:text-white group-hover:opacity-100"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
-    </Reorder.Item>
-  );
-}
 
 export function QueuePanel() {
   const open = usePlayer((s) => s.queueOpen);
@@ -94,13 +20,6 @@ export function QueuePanel() {
   const clearQueue = usePlayer((s) => s.clearQueue);
   const autoAdd = usePlayer((s) => s.autoAddSimilar);
   const toggleAutoAdd = usePlayer((s) => s.toggleAutoAdd);
-  const reorderQueue = usePlayer((s) => s.reorderQueue);
-
-  const [localQueue, setLocalQueue] = useState(queue);
-
-  useEffect(() => {
-    setLocalQueue(queue);
-  }, [queue]);
 
   useLockBody(open);
 
@@ -159,31 +78,53 @@ export function QueuePanel() {
                   </p>
                 </div>
               ) : (
-                <Reorder.Group
-                  axis="y"
-                  values={localQueue}
-                  onReorder={(newOrder) => {
-                    setLocalQueue(newOrder);
-                    reorderQueue(newOrder);
-                  }}
-                  className="space-y-0.5"
-                  layoutScroll
-                >
-                  {localQueue.map((song, i) => {
-                    const active = song.id === queue[currentIndex]?.id;
+                <div className="space-y-0.5">
+                  {queue.map((song, i) => {
+                    const active = i === currentIndex;
                     return (
-                      <QueueItem
-                        key={song.id}
-                        song={song}
-                        index={i}
-                        active={active}
-                        isPlaying={isPlaying}
-                        onSelect={() => setIndex(i)}
-                        onRemove={() => removeAt(i)}
-                      />
+                      <div
+                        key={`${song.id}-${i}`}
+                        onClick={() => setIndex(i)}
+                        className={cn(
+                          "group flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/5",
+                          active && "bg-white/5"
+                        )}
+                      >
+                        <div className="relative w-10 shrink-0">
+                          <Cover src={song.image} alt={song.title} className="aspect-square rounded-md" />
+                          {active && isPlaying && (
+                            <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/50">
+                              <PlayingBars className="h-3.5" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={cn(
+                              "truncate text-sm font-medium",
+                              active ? "text-accent" : "text-zinc-200"
+                            )}
+                          >
+                            {song.title}
+                          </p>
+                          <p className="truncate text-xs text-zinc-500">
+                            {song.artists.join(", ") || song.album}
+                          </p>
+                        </div>
+                        <button
+                          aria-label="Remove from queue"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeAt(i);
+                          }}
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-600 opacity-0 transition hover:text-white group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     );
                   })}
-                </Reorder.Group>
+                </div>
               )}
             </div>
 

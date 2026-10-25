@@ -30,9 +30,6 @@ interface LibraryState {
   addDownload: (song: Song) => void;
   removeDownload: (songId: string) => void;
   pushRecent: (song: Song) => void;
-  playCounts: Record<string, number>;
-  incrementPlayCount: (songId: string) => void;
-  getTopPlayed: (songs: Song[], limit?: number) => Song[];
 }
 
 export const useLibrary = create<LibraryState>()(
@@ -42,7 +39,6 @@ export const useLibrary = create<LibraryState>()(
       playlists: [],
       downloads: [],
       recentlyPlayed: [],
-      playCounts: {},
 
       toggleFavourite: (song) => {
         const { favourites } = get();
@@ -113,21 +109,6 @@ export const useLibrary = create<LibraryState>()(
       pushRecent: (song) => {
         const rest = get().recentlyPlayed.filter((s) => s.id !== song.id);
         set({ recentlyPlayed: [song, ...rest].slice(0, 50) });
-      },
-
-      incrementPlayCount: (songId) => {
-        const { playCounts } = get();
-        set({
-          playCounts: { ...playCounts, [songId]: (playCounts[songId] ?? 0) + 1 },
-        });
-      },
-
-      getTopPlayed: (songs, limit = 10) => {
-        const { playCounts } = get();
-        return [...songs]
-          .filter((s) => playCounts[s.id])
-          .sort((a, b) => (playCounts[b.id] ?? 0) - (playCounts[a.id] ?? 0))
-          .slice(0, limit);
       },
     }),
     {

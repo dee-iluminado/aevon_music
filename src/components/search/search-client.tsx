@@ -8,10 +8,18 @@ import { AlbumCardGrid } from "@/components/cards/album-card";
 import { PlaylistCard } from "@/components/cards/playlist-card";
 import { ArtistCard } from "@/components/cards/artist-card";
 import { RowSkeleton, SongCardSkeleton } from "@/components/ui/skeleton";
-import { SearchTabs, isSearchTab, type SearchTabType } from "@/components/search/search-tabs";
 import { QUICK_SEARCHES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Album, ArtistInfo, Playlist, Song } from "@/lib/types";
+
+type Tab = "songs" | "albums" | "playlists" | "artists";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "songs", label: "Songs" },
+  { id: "albums", label: "Albums" },
+  { id: "playlists", label: "Playlists" },
+  { id: "artists", label: "Artists" },
+];
 
 interface Results {
   songs?: Song[];
@@ -22,28 +30,27 @@ interface Results {
 
 interface FetchState {
   q: string;
-  tab: SearchTabType;
+  tab: Tab;
   results: Results | null;
   error: boolean;
 }
 
-interface SearchClientProps {
-  initialQuery?: string;
-  initialType?: string;
+function isTab(value: string | null): value is Tab {
+  return value === "songs" || value === "albums" || value === "playlists" || value === "artists";
 }
 
-export function SearchClient({ initialQuery, initialType }: SearchClientProps = {}) {
+export function SearchClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const urlQuery = searchParams.get("q") ?? initialQuery ?? "";
-  const urlTab = searchParams.get("type") ?? initialType;
+  const urlQuery = searchParams.get("q") ?? "";
+  const urlTab = searchParams.get("type");
 
   const [query, setQuery] = useState(urlQuery);
   const [debounced, setDebounced] = useState(urlQuery);
-  const [tab, setTab] = useState<SearchTabType>(isSearchTab(urlTab) ? urlTab : "all");
+  const [tab, setTab] = useState<Tab>(isTab(urlTab) ? urlTab : "songs");
   const [focused, setFocused] = useState(false);
   const [state, setState] = useState<FetchState | null>(null);
-  const [synced, setSynced] = useState<{ q: string; tab: string | null | undefined }>({
+  const [synced, setSynced] = useState<{ q: string; tab: string | null }>({
     q: urlQuery,
     tab: urlTab,
   });
@@ -53,43 +60,21 @@ export function SearchClient({ initialQuery, initialType }: SearchClientProps = 
     inputRef.current?.focus();
   }, []);
 
-  // Keep local state in sync when the URL changes underneath us (e.g. navigation or back/forward)
+  // Keep local state in sync when the URL changes underneath us (e.g. the
+  // "See all" links on the home page navigate to /search?q=...).
   if (synced.q !== urlQuery || synced.tab !== urlTab) {
     setSynced({ q: urlQuery, tab: urlTab });
     setQuery(urlQuery);
     setDebounced(urlQuery);
-    setTab(isSearchTab(urlTab) ? urlTab : "all");
+    if (isTab(urlTab)) setTab(urlTab);
   }
-
-  const handleTabChange = (newTab: SearchTabType) => {
-    setTab(newTab);
-    const params = new URLSearchParams(searchParams.toString());
-    const q = (query || debounced).trim();
-    if (q) {
-      params.set("q", q);
-    }
-    if (newTab === "all") {
-      params.delete("type");
-    } else {
-      params.set("type", newTab);
-    }
-    const qs = params.toString();
-    router.replace(`/search${qs ? `?${qs}` : ""}`, {
-      scroll: false,
-    });
-  };
 
   useEffect(() => {
     const t = setTimeout(() => {
       const q = query.trim();
       setDebounced(q);
       if (q) {
-        const params = new URLSearchParams();
-        params.set("q", q);
-        if (tab !== "all") {
-          params.set("type", tab);
-        }
-        router.replace(`/search?${params.toString()}`, {
+        router.replace(`/search?q=${encodeURIComponent(q)}&type=${tab}`, {
           scroll: false,
         });
       }
@@ -128,22 +113,24 @@ export function SearchClient({ initialQuery, initialType }: SearchClientProps = 
   const playlists = results?.playlists ?? [];
   const artists = results?.artists ?? [];
 
-  const hasSearched = !!debounced && !loading;
-  const hasAnyResults =
-    songs.length > 0 || albums.length > 0 || playlists.length > 0 || artists.length > 0;
+  let list: Song[] | Album[] | Playlist[] | ArtistInfo[];
+  switch (tab) {
+    case "songs":
+      list = songs;
+      break;
+    case "albums":
+      list = albums;
+      break;
+    case "playlists":
+      list = playlists;
+      break;
+    case "artists":
+      list = artists;
+      break;
+  }
 
-  const empty =
-    hasSearched &&
-    !error &&
-    (tab === "all"
-      ? !hasAnyResults
-      : tab === "songs"
-      ? songs.length === 0
-      : tab === "albums"
-      ? albums.length === 0
-      : tab === "artists"
-      ? artists.length === 0
-      : playlists.length === 0);
+  const hasSearched = !!debounced && !loading;
+  const empty = hasSearched && !error && list.length === 0;
 
   return (
     <div className="space-y-6 pt-4">
@@ -167,14 +154,6 @@ export function SearchClient({ initialQuery, initialType }: SearchClientProps = 
         </div>
       </div>
 
-      <div className="flex items-center justify-start overflow-x-auto pb-1 hide-scrollbar">
-        <SearchTabs
-          currentTab={tab}
-          onTabChange={handleTabChange}
-          query={debounced || query}
-        />
-      </div>
-
       {!debounced && (
         <div className="space-y-3">
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub">
@@ -194,33 +173,29 @@ export function SearchClient({ initialQuery, initialType }: SearchClientProps = 
         </div>
       )}
 
+      {debounced && (
+        <div className="flex gap-1 overflow-x-auto rounded-full bg-panel-2/80 p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition",
+                tab === t.id
+                  ? "bg-accent text-white"
+                  : "text-sub hover:text-white"
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading && (
-        <div className="space-y-8">
+        <div className="space-y-1">
           {tab === "songs" ? (
-            <div className="space-y-1">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <RowSkeleton key={i} />
-              ))}
-            </div>
-          ) : tab === "all" ? (
-            <div className="space-y-8">
-              <div className="space-y-2">
-                <div className="h-6 w-24 animate-pulse rounded bg-white/5" />
-                <div className="space-y-1">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <RowSkeleton key={i} />
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="h-6 w-24 animate-pulse rounded bg-white/5" />
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <SongCardSkeleton key={i} />
-                  ))}
-                </div>
-              </div>
-            </div>
+            Array.from({ length: 8 }).map((_, i) => <RowSkeleton key={i} />)
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               {Array.from({ length: 10 }).map((_, i) => (
@@ -245,119 +220,11 @@ export function SearchClient({ initialQuery, initialType }: SearchClientProps = 
         <div className="flex flex-col items-center gap-3 py-20 text-center">
           <SearchX className="h-10 w-10 text-zinc-600" />
           <p className="text-sm text-zinc-400">
-            {tab === "all"
-              ? `No results found for “${debounced}”.`
-              : `No ${tab} found for “${debounced}”.`}
+            No {tab} found for “{debounced}”.
           </p>
         </div>
       )}
 
-      {/* "All" tab - show all sections */}
-      {hasSearched && !error && tab === "all" && hasAnyResults && (
-        <div className="space-y-10">
-          {songs.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="mm-eyebrow-rule" aria-hidden />
-                  <h2 className="font-heading text-lg font-semibold text-fg sm:text-xl">
-                    Songs
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleTabChange("songs")}
-                  className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub transition-colors hover:text-fg"
-                >
-                  See all
-                </button>
-              </div>
-              <div className="space-y-0.5">
-                {songs.map((song, i) => (
-                  <SongRow key={song.id} song={song} index={i} context={songs} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {albums.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="mm-eyebrow-rule" aria-hidden />
-                  <h2 className="font-heading text-lg font-semibold text-fg sm:text-xl">
-                    Albums
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleTabChange("albums")}
-                  className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub transition-colors hover:text-fg"
-                >
-                  See all
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                {albums.map((album) => (
-                  <AlbumCardGrid key={album.id} album={album} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {artists.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="mm-eyebrow-rule" aria-hidden />
-                  <h2 className="font-heading text-lg font-semibold text-fg sm:text-xl">
-                    Artists
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleTabChange("artists")}
-                  className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub transition-colors hover:text-fg"
-                >
-                  See all
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-4">
-                {artists.map((artist) => (
-                  <ArtistCard key={artist.id} artist={artist} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {playlists.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="mm-eyebrow-rule" aria-hidden />
-                  <h2 className="font-heading text-lg font-semibold text-fg sm:text-xl">
-                    Playlists
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleTabChange("playlists")}
-                  className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub transition-colors hover:text-fg"
-                >
-                  See all
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-4">
-                {playlists.map((playlist) => (
-                  <PlaylistCard key={playlist.id} playlist={playlist} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Specific tabs */}
       {hasSearched && !error && tab === "songs" && songs.length > 0 && (
         <div className="space-y-0.5">
           {songs.map((song, i) => (
@@ -374,18 +241,18 @@ export function SearchClient({ initialQuery, initialType }: SearchClientProps = 
         </div>
       )}
 
-      {hasSearched && !error && tab === "artists" && artists.length > 0 && (
-        <div className="flex flex-wrap gap-4">
-          {artists.map((artist) => (
-            <ArtistCard key={artist.id} artist={artist} />
-          ))}
-        </div>
-      )}
-
       {hasSearched && !error && tab === "playlists" && playlists.length > 0 && (
         <div className="flex flex-wrap gap-4">
           {playlists.map((playlist) => (
             <PlaylistCard key={playlist.id} playlist={playlist} />
+          ))}
+        </div>
+      )}
+
+      {hasSearched && !error && tab === "artists" && artists.length > 0 && (
+        <div className="flex flex-wrap gap-4">
+          {artists.map((artist) => (
+            <ArtistCard key={artist.id} artist={artist} />
           ))}
         </div>
       )}

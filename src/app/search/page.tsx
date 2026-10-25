@@ -8,19 +8,10 @@ export const metadata: Metadata = {
     "Search millions of songs, albums, playlists and artists from the JioSaavn catalog.",
 };
 
-interface SearchPageProps {
-  searchParams?: Promise<{ q?: string; type?: string }>;
-}
-
-export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const resolvedParams = searchParams ? await searchParams : undefined;
-
+export default function SearchPage() {
   return (
     <Suspense fallback={<SearchFallback />}>
-      <SearchClient
-        initialQuery={resolvedParams?.q}
-        initialType={resolvedParams?.type}
-      />
+      <SearchClient />
     </Suspense>
   );
 }
@@ -28,4 +19,3 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 function SearchFallback() {
   return <div className="h-40 animate-pulse rounded-2xl bg-white/5" />;
 }
-

@@ -5,8 +5,6 @@ import { PlaylistCard } from "@/components/cards/playlist-card";
 import { AlbumCard } from "@/components/cards/album-card";
 import { SongCardSkeleton } from "@/components/ui/skeleton";
 import { LikedSongsCard } from "@/components/home/liked-songs-card";
-import { RecentlyPlayedSection } from "@/components/home/recently-played-section";
-import { TopTracksSection } from "@/components/home/top-tracks-section";
 import {
   getEnglishHomeSongs,
   safe,
@@ -24,36 +22,18 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function HomePage() {
-  const [
-    songs,
-    albums,
-    playlists,
-    chillPlaylists,
-    partyPlaylists,
-    focusPlaylists,
-  ] = await Promise.all([
+  const [songs, albums, playlists] = await Promise.all([
     safe(getEnglishHomeSongs(14), []),
     safe(searchAlbums("english", 1, 24), [])
       .then((list) => list.filter((a) => a.language === "english")),
     safe(searchPlaylists("english", 1, 24), [])
       .then((list) => list.filter((p) => p.language === "english")),
-    safe(searchPlaylists("chill lofi", 1, 14), []),
-    safe(searchPlaylists("party hits", 1, 14), []),
-    safe(searchPlaylists("focus study", 1, 14), []),
   ]);
 
-  const loading =
-    !songs.length &&
-    !albums.length &&
-    !playlists.length &&
-    !chillPlaylists.length &&
-    !partyPlaylists.length &&
-    !focusPlaylists.length;
+  const loading = !songs.length && !albums.length && !playlists.length;
 
   return (
     <div className="space-y-14 pb-6">
-      <RecentlyPlayedSection />
-      <TopTracksSection />
       <LikedSongsCard />
 
       {loading ? (
@@ -102,42 +82,6 @@ export default async function HomePage() {
               href="/search?q=english&type=playlists"
             >
               {playlists.slice(0, 14).map((playlist) => (
-                <PlaylistCard key={playlist.id} playlist={playlist} />
-              ))}
-            </Section>
-          )}
-
-          {chillPlaylists.length > 0 && (
-            <Section
-              title="Chill & Lofi"
-              subtitle="Laid-back beats and relaxing vibes"
-              href="/search?q=chill%20lofi&type=playlists"
-            >
-              {chillPlaylists.slice(0, 14).map((playlist) => (
-                <PlaylistCard key={playlist.id} playlist={playlist} />
-              ))}
-            </Section>
-          )}
-
-          {partyPlaylists.length > 0 && (
-            <Section
-              title="Party Hits"
-              subtitle="High-energy tracks for your celebration"
-              href="/search?q=party%20hits&type=playlists"
-            >
-              {partyPlaylists.slice(0, 14).map((playlist) => (
-                <PlaylistCard key={playlist.id} playlist={playlist} />
-              ))}
-            </Section>
-          )}
-
-          {focusPlaylists.length > 0 && (
-            <Section
-              title="Focus & Study"
-              subtitle="Deep concentration and ambient sounds"
-              href="/search?q=focus%20study&type=playlists"
-            >
-              {focusPlaylists.slice(0, 14).map((playlist) => (
                 <PlaylistCard key={playlist.id} playlist={playlist} />
               ))}
             </Section>
