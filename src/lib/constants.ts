@@ -1,6 +1,6 @@
 export const APP_NAME = "AEVON Music";
 export const APP_DESCRIPTION =
-  "AEVON Music is a free, minimalist music streaming web app powered by the JioSaavn catalog. Search, stream and download high-quality songs across English, Punjabi, Tamil, Telugu, Malayalam and more.";
+  "AEVON Music is a free, minimalist music streaming web app powered by the JioSaavn catalog. Search, stream and download high-quality songs across English, Spanish, French, Italian, Amharic, Brazilian and more.";
 
 export const DEFAULT_BASE = "https://shnwazdev-jiosaavn-apii.vercel.app";
 export const FALLBACK_BASE = "https://saavn.dev";
@@ -21,23 +21,17 @@ export const ALLOWED_MEDIA_HOSTS = [
 export interface LanguageOption {
   label: string;
   value: string;
+  /** Search query used by the Browse tile. Defaults to the label. */
+  query?: string;
 }
 
 export const LANGUAGES: LanguageOption[] = [
   { label: "English", value: "english" },
-  { label: "Punjabi", value: "punjabi" },
-  { label: "Haryanvi", value: "haryanvi" },
-  { label: "Rajasthani", value: "rajasthani" },
-  { label: "Tamil", value: "tamil" },
-  { label: "Telugu", value: "telugu" },
-  { label: "Odia", value: "odia" },
-  { label: "Marathi", value: "marathi" },
-  { label: "Gujarati", value: "gujarati" },
-  { label: "Kannada", value: "kannada" },
-  { label: "Malayalam", value: "malayalam" },
-  { label: "Bengali", value: "bengali" },
-  { label: "Bhojpuri", value: "bhojpuri" },
-  { label: "Urdu", value: "urdu" },
+  { label: "Spanish", value: "spanish", query: "Spanish songs" },
+  { label: "French", value: "french", query: "French songs" },
+  { label: "Italian", value: "italian", query: "Italian" },
+  { label: "Amharic", value: "amharic", query: "Amharic songs" },
+  { label: "Brazil", value: "brazil", query: "Brazilian" },
 ];
 
 export const QUICK_SEARCHES = [

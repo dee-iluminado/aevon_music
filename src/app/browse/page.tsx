@@ -12,7 +12,7 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: "Browse",
   description:
-    "Browse music by language or mood — English, Punjabi, Tamil, Telugu, Malayalam and more. Free streaming on AEVON Music.",
+    "Browse music by language or mood — English, Spanish, French, Italian, Amharic, Brazilian and more. Free streaming on AEVON Music.",
 };
 
 const MOODS = [
@@ -28,12 +28,41 @@ const MOODS = [
   { label: "Indie", query: "indie" },
 ] as const;
 
+// Editorial playlists rarely expose a language, so keep the mood rail aligned
+// with the language tiles above by dropping titles that name a removed one.
+const HIDDEN_LANGUAGE_NAMES = [
+  "hindi",
+  "punjabi",
+  "haryanvi",
+  "rajasthani",
+  "tamil",
+  "telugu",
+  "odia",
+  "marathi",
+  "gujarati",
+  "kannada",
+  "malayalam",
+  "bengali",
+  "bhojpuri",
+  "urdu",
+  "bollywood",
+  "tollywood",
+  "kollywood",
+  "mollywood",
+  "sandalwood",
+];
+
+function namesRemovedLanguage(playlist: Playlist) {
+  const name = playlist.name.toLowerCase();
+  return HIDDEN_LANGUAGE_NAMES.some((term) => name.includes(term));
+}
+
 const TILE =
   "group relative flex h-24 flex-col justify-end overflow-hidden rounded-xl border border-line/70 bg-gradient-to-br from-panel-2 via-panel to-panel p-4 transition hover:border-accent/40 hover:from-accent/15 hover:to-panel sm:h-28";
 
 export default async function BrowsePage() {
   const lists = await Promise.all(
-    ["romantic hits", "party hits", "chill", "lofi"].map((query) =>
+    ["chill", "lofi", "jazz", "acoustic", "workout", "sleep"].map((query) =>
       safe(searchPlaylists(query, 1, 10), [])
     )
   );
@@ -42,6 +71,7 @@ export default async function BrowsePage() {
   const playlists: Playlist[] = [];
   for (const playlist of lists.flat()) {
     if (!playlist.id || seen.has(playlist.id)) continue;
+    if (namesRemovedLanguage(playlist)) continue;
     seen.add(playlist.id);
     playlists.push(playlist);
   }
@@ -67,11 +97,11 @@ export default async function BrowsePage() {
           <Music2 className="h-4.5 w-4.5 text-accent" />
           Languages
         </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {LANGUAGES.map((lang) => (
             <Link
               key={lang.value}
-              href={`/search?q=${encodeURIComponent(lang.label)}&type=songs`}
+              href={`/search?q=${encodeURIComponent(lang.query ?? lang.label)}&type=songs`}
               className={TILE}
             >
               <span
