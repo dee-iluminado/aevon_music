@@ -9,15 +9,6 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "www.jiosaavn.com" },
     ],
   },
-  async redirects() {
-    return [
-      {
-        source: "/favicon.ico",
-        destination: "/logo.png",
-        permanent: false,
-      },
-    ];
-  },
   async headers() {
     return [
       {
@@ -28,7 +19,24 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/logo.png",
+        // Browsers and CDNs cache favicons aggressively; revalidate so a new
+        // icon shows up on the next visit instead of sticking for months.
+        source: "/favicon.ico",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        ],
+      },
+      {
+        // The service worker and its offline fallback must never be cached,
+        // otherwise a stale worker keeps serving old code.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        source: "/offline.html",
         headers: [
           { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
         ],

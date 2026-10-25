@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "aevon-music-android/**",
+    "narrative-clips/**",
+    ".freebuff/**",
   ]),
 ]);
 

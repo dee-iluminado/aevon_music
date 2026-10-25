@@ -5,7 +5,9 @@ import { PlayerProvider } from "@/providers/player-provider";
 import { AppShell } from "@/components/app-shell";
 import { PlayerBar } from "@/components/player/player-bar";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { OfflineBanner } from "@/components/offline-banner";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -24,7 +26,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: `${APP_NAME} — Free Music Streaming`,
     template: `%s · ${APP_NAME}`,
@@ -43,25 +45,22 @@ export const metadata: Metadata = {
   openGraph: {
     title: `${APP_NAME} — Free Music Streaming`,
     description: APP_DESCRIPTION,
-    type: "website",
+    url: SITE_URL,
     siteName: APP_NAME,
+    type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: `${APP_NAME} — Free Music Streaming`,
     description: APP_DESCRIPTION,
+    images: [`${SITE_URL}/opengraph-image.png`],
   },
-  icons: {
-    icon: [
-      { url: "/logo.png?v=2", type: "image/png" },
-    ],
-    shortcut: "/logo.png?v=2",
-    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
-  },
+  // Icons come from the file conventions in this folder:
+  // favicon.ico, icon.png and apple-icon.png.
 };
 
 export const viewport: Viewport = {
-  themeColor: "#100f0d",
+  themeColor: "#0d0c0b",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -75,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-full">
         <PlayerProvider>
+          <OfflineBanner />
           <AppShell>{children}</AppShell>
           <PlayerBar />
           <Toaster
