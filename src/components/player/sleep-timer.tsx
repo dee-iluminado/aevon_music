@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Moon, X } from "lucide-react";
 import { usePlayer } from "@/stores/player-store";
@@ -28,8 +29,14 @@ export function SleepTimer({
   const setSleep = usePlayer((s) => s.setSleep);
   const [open, setOpen] = useState(false);
   const [, tick] = useState(0);
+  // The timer can be opened from the full-screen now-playing sheet, which has
+  // a transform/backdrop-filter ancestor. A fixed overlay inside that tree is
+  // positioned/clipped by the sheet, so the dialog lives in a portal on <body>.
+  const [portalReady, setPortalReady] = useState(false);
 
   useLockBody(open);
+
+  useEffect(() => setPortalReady(true), []);
 
   useEffect(() => {
     if (!sleepAt) return;
@@ -74,9 +81,11 @@ export function SleepTimer({
         ) : null}
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
+      {portalReady &&
+        createPortal(
+          <AnimatePresence>
+            {open && (
+              <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -143,9 +152,11 @@ export function SleepTimer({
                 </button>
               </div>
             </motion.div>
-          </div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
-      </AnimatePresence>
     </>
   );
 }

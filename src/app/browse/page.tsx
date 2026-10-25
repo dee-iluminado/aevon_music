@@ -12,7 +12,7 @@ export const revalidate = 3600;
 export const metadata: Metadata = {
   title: "Browse",
   description:
-    "Browse music by language or mood — Hindi, English, Punjabi, Tamil, Telugu and more. Free streaming on AEVON Music.",
+    "Browse music by language or mood — English, Punjabi, Tamil, Telugu, Malayalam and more. Free streaming on AEVON Music.",
 };
 
 const MOODS = [

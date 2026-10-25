@@ -4,6 +4,7 @@ import {
   SAAVN_BASE,
   SAAVN_FALLBACK_BASE,
 } from "./constants";
+import { isBlockedLanguage, withoutBlocked } from "./content-filter";
 import type {
   Album,
   ArtistInfo,
@@ -297,7 +298,7 @@ export async function searchSongs(
     { query, page, limit },
     { noStore: true, ...opts }
   );
-  const songs = extractList(data).map(normalizeSong);
+  const songs = withoutBlocked(extractList(data).map(normalizeSong));
 
   if (page === 1 && songs.length < Math.min(limit, 8)) {
     const extra = await deezerSearchSongs(query, 12);
@@ -308,7 +309,7 @@ export async function searchSongs(
       ...songs,
       ...extra.filter((d) => !seen.has(key(d))),
     ];
-    return merged.slice(0, Math.max(limit, 24));
+    return withoutBlocked(merged).slice(0, Math.max(limit, 24));
   }
 
   return songs;
@@ -348,7 +349,7 @@ export async function searchAlbums(
     { query, page, limit },
     { noStore: true }
   );
-  return extractList(data).map(normalizeAlbum);
+  return withoutBlocked(extractList(data).map(normalizeAlbum));
 }
 
 export async function searchPlaylists(
@@ -361,7 +362,7 @@ export async function searchPlaylists(
     { query, page, limit },
     { noStore: true }
   );
-  return extractList(data).map(normalizePlaylist);
+  return withoutBlocked(extractList(data).map(normalizePlaylist));
 }
 
 export async function searchArtists(
@@ -392,34 +393,53 @@ export async function searchAll(query: string, limit = 10): Promise<SearchAll> {
   );
   const d = (data ?? {}) as Record<string, unknown>;
   return {
-    songs: extractList(d.songs ?? []).map(normalizeSong),
-    albums: extractList(d.albums ?? []).map(normalizeAlbum),
-    playlists: extractList(d.playlists ?? []).map(normalizePlaylist),
+    songs: withoutBlocked(extractList(d.songs ?? []).map(normalizeSong)),
+    albums: withoutBlocked(extractList(d.albums ?? []).map(normalizeAlbum)),
+    playlists: withoutBlocked(
+      extractList(d.playlists ?? []).map(normalizePlaylist)
+    ),
     artists: extractList(d.artists ?? []).map(normalizeArtist),
   };
 }
 
 export async function getSong(id: string): Promise<Song | null> {
-  if (id.startsWith("dz-")) return deezerGetSong(id);
+  if (id.startsWith("dz-")) {
+    const song = await deezerGetSong(id);
+    return song && !isBlockedLanguage(song.language) ? song : null;
+  }
   const data = await request<Raw | Raw[]>("/api/songs/{id}", { id });
   const item = Array.isArray(data) ? data[0] : data;
-  return item && typeof item === "object" ? normalizeSong(item) : null;
+  if (!item || typeof item !== "object") return null;
+  const song = normalizeSong(item);
+  return isBlockedLanguage(song.language) ? null : song;
 }
 
 export async function getSongs(ids: string[]): Promise<Song[]> {
   if (!ids.length) return [];
   const data = await request("/api/songs", { ids: ids.join(",") }, { noStore: true });
-  return extractList(data).map(normalizeSong);
+  return withoutBlocked(extractList(data).map(normalizeSong));
 }
 
 export async function getAlbum(id: string): Promise<Album | null> {
   const data = await request<Raw>("/api/albums/{id}", { id });
-  return data && typeof data === "object" ? normalizeAlbum(data) : null;
+  if (!data || typeof data !== "object") return null;
+  const album = normalizeAlbum(data);
+  if (isBlockedLanguage(album.language)) return null;
+  if (album.songs) {
+    return { ...album, songs: withoutBlocked(album.songs) };
+  }
+  return album;
 }
 
 export async function getPlaylist(id: string): Promise<Playlist | null> {
   const data = await request<Raw>("/api/playlists/{id}", { id });
-  return data && typeof data === "object" ? normalizePlaylist(data) : null;
+  if (!data || typeof data !== "object") return null;
+  const playlist = normalizePlaylist(data);
+  if (isBlockedLanguage(playlist.language)) return null;
+  if (playlist.songs) {
+    return { ...playlist, songs: withoutBlocked(playlist.songs) };
+  }
+  return playlist;
 }
 
 export async function getArtist(id: string): Promise<ArtistInfo | null> {
@@ -446,7 +466,7 @@ export async function getArtistSongs(
   );
   for (const r of settled) {
     if (r.status !== "fulfilled") continue;
-    for (const song of extractList(r.value).map(normalizeSong)) {
+    for (const song of withoutBlocked(extractList(r.value).map(normalizeSong))) {
       if (!seen.has(song.id)) {
         seen.add(song.id);
         all.push(song);
@@ -467,7 +487,7 @@ export async function getArtistAlbums(
   // some artists, so only send it when actually paginating.
   if (page > 1) params.page = page;
   const data = await request("/api/artists/{id}/albums", { id, ...params }, { noStore: true });
-  return extractList(data).map(normalizeAlbum);
+  return withoutBlocked(extractList(data).map(normalizeAlbum));
 }
 
 export async function getSongSuggestions(
@@ -479,7 +499,7 @@ export async function getSongSuggestions(
     { id, limit },
     { noStore: true }
   );
-  return extractList(data).map(normalizeSong);
+  return withoutBlocked(extractList(data).map(normalizeSong));
 }
 
 export async function getLyrics(id: string): Promise<Lyrics | null> {
@@ -501,22 +521,22 @@ export async function getLyrics(id: string): Promise<Lyrics | null> {
 
 export async function getTrendingSongs(limit = 20): Promise<Song[]> {
   const data = await request("/api/trending/songs", { limit }, { revalidate: 3600 });
-  return extractList(data).map(normalizeSong);
+  return withoutBlocked(extractList(data).map(normalizeSong));
 }
 
 export async function getTrendingAlbums(limit = 20): Promise<Album[]> {
   const data = await request("/api/trending/albums", { limit }, { revalidate: 3600 });
-  return extractList(data).map(normalizeAlbum);
+  return withoutBlocked(extractList(data).map(normalizeAlbum));
 }
 
 export async function getTrendingPlaylists(limit = 20): Promise<Playlist[]> {
   const data = await request("/api/trending/playlists", { limit }, { revalidate: 3600 });
-  return extractList(data).map(normalizePlaylist);
+  return withoutBlocked(extractList(data).map(normalizePlaylist));
 }
 
 export async function getCharts(): Promise<Playlist[]> {
   const data = await request("/api/charts", undefined, { revalidate: 3600 });
-  return extractList(data).map(normalizePlaylist);
+  return withoutBlocked(extractList(data).map(normalizePlaylist));
 }
 
 export async function safe<T>(

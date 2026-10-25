@@ -1,6 +1,6 @@
 export const APP_NAME = "AEVON Music";
 export const APP_DESCRIPTION =
-  "AEVON Music is a free, minimalist music streaming web app powered by the JioSaavn catalog. Search, stream and download high-quality songs across Hindi, Punjabi, English, Tamil and more.";
+  "AEVON Music is a free, minimalist music streaming web app powered by the JioSaavn catalog. Search, stream and download high-quality songs across English, Punjabi, Tamil, Telugu, Malayalam and more.";
 
 export const DEFAULT_BASE = "https://shnwazdev-jiosaavn-apii.vercel.app";
 export const FALLBACK_BASE = "https://saavn.dev";
@@ -24,7 +24,6 @@ export interface LanguageOption {
 }
 
 export const LANGUAGES: LanguageOption[] = [
-  { label: "Hindi", value: "hindi" },
   { label: "English", value: "english" },
   { label: "Punjabi", value: "punjabi" },
   { label: "Haryanvi", value: "haryanvi" },
@@ -42,12 +41,12 @@ export const LANGUAGES: LanguageOption[] = [
 ];
 
 export const QUICK_SEARCHES = [
-  "Arijit Singh",
-  "A.R. Rahman",
+  "English",
+  "Pop",
+  "Hip Hop",
   "Punjabi",
   "Lofi",
   "Romantic",
   "Party",
-  "Bollywood",
   "Sleep",
 ];

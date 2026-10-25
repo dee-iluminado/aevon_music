@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Album, ArtistInfo, Song } from "@/lib/types";
+import { isBlockedItem, withoutBlocked } from "@/lib/content-filter";
 import { uid } from "@/lib/utils";
 
 export interface UserPlaylist {
@@ -52,6 +53,7 @@ export const useLibrary = create<LibraryState>()(
       playCounts: {},
 
       toggleFavourite: (song) => {
+        if (isBlockedItem(song)) return;
         const { favourites } = get();
         const exists = favourites.some((s) => s.id === song.id);
         set({
@@ -89,6 +91,7 @@ export const useLibrary = create<LibraryState>()(
       },
 
       addToPlaylist: (playlistId, song) => {
+        if (isBlockedItem(song)) return;
         set({
           playlists: get().playlists.map((p) => {
             if (p.id !== playlistId) return p;
@@ -109,6 +112,7 @@ export const useLibrary = create<LibraryState>()(
       },
 
       addDownload: (song) => {
+        if (isBlockedItem(song)) return;
         if (get().downloads.some((s) => s.id === song.id)) return;
         set({ downloads: [song, ...get().downloads] });
       },
@@ -118,6 +122,7 @@ export const useLibrary = create<LibraryState>()(
       },
 
       pushRecent: (song) => {
+        if (isBlockedItem(song)) return;
         const rest = get().recentlyPlayed.filter((s) => s.id !== song.id);
         set({ recentlyPlayed: [song, ...rest].slice(0, 50) });
       },
@@ -128,6 +133,7 @@ export const useLibrary = create<LibraryState>()(
       },
 
       toggleAlbum: (album) => {
+        if (isBlockedItem(album)) return;
         const exists = get().albums.some((a) => a.id === album.id);
         set({
           albums: exists
@@ -152,18 +158,30 @@ export const useLibrary = create<LibraryState>()(
     {
       name: "hayasaka-library-v1",
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
         const state = (persisted ?? {}) as Partial<LibraryState>;
-        if (version < 2) {
+        const cleaned = {
+          ...state,
+          albums: (state.albums ?? []).filter((album) => !isBlockedItem(album)),
+          artists: state.artists ?? [],
+          playCounts: state.playCounts ?? {},
+        };
+        if (version < 3) {
+          // Catalog policy changed: drop previously saved Hindi tracks so an
+          // existing library can never surface blocked content again.
           return {
-            ...state,
-            albums: state.albums ?? [],
-            artists: state.artists ?? [],
-            playCounts: state.playCounts ?? {},
+            ...cleaned,
+            favourites: withoutBlocked(cleaned.favourites ?? []),
+            downloads: withoutBlocked(cleaned.downloads ?? []),
+            recentlyPlayed: withoutBlocked(cleaned.recentlyPlayed ?? []),
+            playlists: (cleaned.playlists ?? []).map((playlist) => ({
+              ...playlist,
+              songs: withoutBlocked(playlist.songs ?? []),
+            })),
           } as LibraryState;
         }
-        return state as LibraryState;
+        return cleaned as LibraryState;
       },
     }
   )

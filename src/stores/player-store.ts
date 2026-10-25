@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Song } from "@/lib/types";
+import { withoutBlocked } from "@/lib/content-filter";
 import { getAudio, mediaSrc, proxiedSrc } from "@/lib/audio";
 import { useProgress } from "@/stores/progress-store";
 import { useLibrary } from "@/stores/library-store";
@@ -426,6 +427,36 @@ export const usePlayer = create<PlayerState>()(
         position: state.position,
         positionId: state.positionId,
       }),
+      // Drop blocked-language tracks that an older session may have stored and
+      // keep the playhead pointing at a real song.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<PlayerState>;
+        const savedQueue = Array.isArray(saved.queue) ? saved.queue : [];
+        const queue = withoutBlocked(savedQueue);
+        const dropped = queue.length !== savedQueue.length;
+        const savedIndex =
+          typeof saved.currentIndex === "number" ? saved.currentIndex : 0;
+        const playingId = savedQueue[savedIndex]?.id;
+        let currentIndex = savedIndex;
+        if (!queue.length) currentIndex = -1;
+        else if (dropped) {
+          const stillThere = playingId
+            ? queue.findIndex((song) => song.id === playingId)
+            : -1;
+          currentIndex = stillThere >= 0 ? stillThere : 0;
+        } else if (currentIndex < 0 || currentIndex >= queue.length) {
+          currentIndex = 0;
+        }
+        return {
+          ...current,
+          ...saved,
+          queue,
+          currentIndex,
+          ...(dropped && currentIndex !== savedIndex
+            ? { position: 0, positionId: "" }
+            : null),
+        };
+      },
     }
   )
 );

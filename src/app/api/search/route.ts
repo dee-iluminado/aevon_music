@@ -7,6 +7,7 @@ import {
   searchPlaylists,
   searchSongs,
 } from "@/lib/api";
+import { isBlockedQuery } from "@/lib/content-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,15 @@ export async function GET(req: NextRequest) {
 
   if (!q) {
     return NextResponse.json({ results: [] });
+  }
+
+  if (isBlockedQuery(q)) {
+    return NextResponse.json({
+      songs: [],
+      albums: [],
+      playlists: [],
+      artists: [],
+    });
   }
 
   switch (type) {

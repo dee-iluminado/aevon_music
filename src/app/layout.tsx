@@ -35,9 +35,9 @@ export const metadata: Metadata = {
   keywords: [
     "free music streaming",
     "online music",
-    "hindi songs",
+    "english songs",
     "punjabi songs",
-    "bollywood",
+    "tamil songs",
     "jiosaavn",
     "mp3 download",
     "aevon music",
