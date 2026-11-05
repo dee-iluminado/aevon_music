@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Loader2, Search, SearchX, X } from "lucide-react";
 import { SongRow } from "@/components/song-row";
 import { AlbumCardGrid } from "@/components/cards/album-card";
@@ -42,7 +42,6 @@ function isTab(value: string | null): value is Tab {
 }
 
 export function SearchClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const mounted = useMounted();
   const urlQuery = searchParams.get("q") ?? "";
@@ -63,6 +62,10 @@ export function SearchClient() {
     tab: urlTab,
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  /* URLs we wrote ourselves while typing. When useSearchParams catches up we
+     must not copy that stale value back into the input — that is what used to
+     eat characters mid-word. */
+  const pushedUrls = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -71,24 +74,33 @@ export function SearchClient() {
   // Keep local state in sync when the URL changes underneath us (e.g. the
   // "See all" links on the home page navigate to /search?q=...).
   if (synced.q !== urlQuery || synced.tab !== urlTab) {
+    const urlKey = `${urlQuery}|${urlTab ?? ""}`;
+    const isOurEcho = pushedUrls.current.delete(urlKey);
     setSynced({ q: urlQuery, tab: urlTab });
-    setQuery(urlQuery);
-    setDebounced(urlQuery);
-    if (isTab(urlTab)) setTab(urlTab);
+    if (!isOurEcho) {
+      setQuery(urlQuery);
+      setDebounced(urlQuery);
+      if (isTab(urlTab)) setTab(urlTab);
+    }
   }
 
   useEffect(() => {
     const t = setTimeout(() => {
       const q = query.trim();
       setDebounced(q);
-      if (q) {
-        router.replace(`/search?q=${encodeURIComponent(q)}&type=${tab}`, {
-          scroll: false,
-        });
+      const next = q
+        ? `/search?q=${encodeURIComponent(q)}&type=${tab}`
+        : `/search?type=${tab}`;
+      // Native history keeps the URL shareable without a router navigation,
+      // which would re-render (and reset) the input while the user types.
+      pushedUrls.current.add(`${q}|${tab}`);
+      if (pushedUrls.current.size > 20) {
+        pushedUrls.current = new Set([`${q}|${tab}`]);
       }
+      window.history.replaceState(null, "", next);
     }, 350);
     return () => clearTimeout(t);
-  }, [query, tab, router]);
+  }, [query, tab]);
 
   useEffect(() => {
     if (!debounced) return;

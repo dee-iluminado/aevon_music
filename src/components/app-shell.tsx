@@ -6,11 +6,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ListMusic, LogIn, LogOut, Menu, Plus, Search, UserPlus, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/logo";
+import { UserAvatar } from "@/components/user-avatar";
 import { Footer } from "@/components/footer";
 import { PlaylistDialog } from "@/components/dialogs/playlist-dialog";
 import { useLibrary } from "@/stores/library-store";
 import { useMounted } from "@/hooks/use-mounted";
-import { AUTH_EVENT, accountInitial, clearAuth, getAuth } from "@/lib/auth";
+import { AUTH_EVENT, clearAuth, getAuth } from "@/lib/auth";
 import type { AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -193,9 +194,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 href="/account"
                 aria-label="Your account"
                 title={`Signed in as ${user.name}`}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ember/15 text-[11px] font-semibold text-ember ring-1 ring-ember/25 transition-colors hover:bg-ember/25"
+                className="ml-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-85"
               >
-                {accountInitial(user.name)}
+                <UserAvatar
+                  name={user.name}
+                  avatar={user.avatar}
+                  className="h-8 w-8"
+                />
               </Link>
             ) : (
               <>
@@ -243,9 +248,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Link
                   href="/account"
                   aria-label="Your account"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ember/15 text-[11px] font-semibold text-ember ring-1 ring-ember/25 transition-colors hover:bg-ember/25"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-85"
                 >
-                  {accountInitial(user.name)}
+                  <UserAvatar
+                    name={user.name}
+                    avatar={user.avatar}
+                    className="h-8 w-8"
+                  />
                 </Link>
               ) : (
                 <Link
@@ -287,9 +296,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                   href="/account"
                   className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg transition-colors hover:bg-fg/5"
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ember/15 text-[10px] font-semibold text-ember ring-1 ring-ember/25">
-                    {accountInitial(user.name)}
-                  </span>
+                  <UserAvatar
+                    name={user.name}
+                    avatar={user.avatar}
+                    className="h-6 w-6"
+                    textClassName="text-[10px]"
+                  />
                   <span className="truncate">Your account</span>
                 </Link>
                 <button

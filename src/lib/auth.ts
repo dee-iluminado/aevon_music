@@ -19,6 +19,7 @@ export interface AuthUser {
   name: string;
   email: string;
   signedUpAt: number;
+  avatar?: string | null;
 }
 
 interface StoredAccount {
@@ -27,6 +28,7 @@ interface StoredAccount {
   salt: string;
   passwordHash: string;
   createdAt: number;
+  avatar?: string | null;
 }
 
 interface AuthResult {
@@ -160,6 +162,7 @@ export async function signUp(
     salt,
     passwordHash,
     createdAt,
+    avatar: null,
   };
   try {
     window.localStorage.setItem(AUTH_ACCOUNT_KEY, JSON.stringify(account));
@@ -172,6 +175,7 @@ export async function signUp(
     name: account.name,
     email: account.email,
     signedUpAt: createdAt,
+    avatar: account.avatar ?? null,
   };
   saveAuth(user);
   return { ok: true, user };
@@ -204,7 +208,34 @@ export async function login(
     name: account.name,
     email: account.email,
     signedUpAt: account.createdAt,
+    avatar: account.avatar ?? null,
   };
   saveAuth(user);
   return { ok: true, user };
+}
+
+/**
+ * Stores a profile photo for the signed-in listener. The image is a small
+ * data URL (resized before it gets here) and is mirrored onto the account
+ * record so it survives signing out and back in.
+ */
+export function updateAvatar(avatar: string | null): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  const session = getAuth();
+  if (!session) return null;
+  const next: AuthUser = { ...session, avatar };
+  try {
+    window.localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(next));
+    const account = readAccount();
+    if (account) {
+      window.localStorage.setItem(
+        AUTH_ACCOUNT_KEY,
+        JSON.stringify({ ...account, avatar })
+      );
+    }
+    announce();
+    return next;
+  } catch {
+    return null;
+  }
 }

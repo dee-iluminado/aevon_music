@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { AuthWall } from "@/components/auth-wall";
 import { Logo } from "@/components/logo";
-import { accountInitial, clearAuth, getAuth, login } from "@/lib/auth";
+import { UserAvatar } from "@/components/user-avatar";
+import { clearAuth, getAuth, login } from "@/lib/auth";
 import type { AuthUser } from "@/lib/auth";
 
 const inputClass =
@@ -74,9 +75,12 @@ export default function LoginPage() {
     return (
       <AuthWall>
         <div className="text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-line bg-panel-2 text-xl font-semibold text-fg ring-1 ring-white/10">
-            {accountInitial(user.name)}
-          </div>
+          <UserAvatar
+            name={user.name}
+            avatar={user.avatar}
+            className="mx-auto mb-6 h-16 w-16 text-xl"
+            textClassName="text-xl"
+          />
           <h1 className="font-heading text-[30px] leading-tight text-fg">
             You&apos;re signed in
           </h1>

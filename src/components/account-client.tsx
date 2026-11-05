@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  Camera,
   Disc3,
   Download,
   Heart,
   ListMusic,
+  Loader2,
   LogIn,
   LogOut,
   Mic2,
@@ -16,8 +18,10 @@ import {
   Play,
   UserPlus,
 } from "lucide-react";
-import { accountInitial, clearAuth, getAuth } from "@/lib/auth";
+import { clearAuth, getAuth, updateAvatar } from "@/lib/auth";
 import type { AuthUser } from "@/lib/auth";
+import { fileToAvatar } from "@/lib/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import { useLibrary } from "@/stores/library-store";
 import { useMounted } from "@/hooks/use-mounted";
 
@@ -42,6 +46,9 @@ export function AccountClient() {
   const router = useRouter();
   const mounted = useMounted();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const favourites = useLibrary((s) => s.favourites);
   const playlists = useLibrary((s) => s.playlists);
@@ -65,6 +72,33 @@ export function AccountClient() {
     () => Object.values(playCounts).reduce((sum, n) => sum + n, 0),
     [playCounts]
   );
+
+  const handlePhoto = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Reset so picking the same file again still fires onChange.
+    event.target.value = "";
+    if (!file) return;
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      const dataUrl = await fileToAvatar(file);
+      const next = updateAvatar(dataUrl);
+      if (!next) throw new Error("Could not save the photo on this device.");
+      setUser(next);
+    } catch (err) {
+      setPhotoError(
+        err instanceof Error ? err.message : "Could not use that image."
+      );
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoError(null);
+    const next = updateAvatar(null);
+    if (next) setUser(next);
+  };
 
   if (!mounted) return null;
 
@@ -126,8 +160,40 @@ export function AccountClient() {
 
         <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-line bg-panel-2 text-xl font-semibold text-fg ring-1 ring-white/10">
-              {accountInitial(user.name)}
+            <div className="flex flex-col items-center gap-1.5">
+              <UserAvatar
+                name={user.name}
+                avatar={user.avatar}
+                className="h-20 w-20 ring-1 ring-white/15"
+                textClassName="text-2xl"
+              />
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhoto}
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={photoBusy}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-sub transition-colors hover:text-fg disabled:opacity-60"
+              >
+                {photoBusy ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Camera className="h-3 w-3" />
+                )}
+                {photoBusy ? "Saving…" : user.avatar ? "Change photo" : "Add photo"}
+              </button>
+              {user.avatar && !photoBusy && (
+                <button
+                  onClick={handleRemovePhoto}
+                  className="text-[11px] text-dim transition-colors hover:text-fg"
+                >
+                  Remove photo
+                </button>
+              )}
             </div>
             <div className="min-w-0">
               <p className="font-mono text-[9px] uppercase tracking-[0.32em] text-ember">
@@ -154,6 +220,12 @@ export function AccountClient() {
             Sign out
           </button>
         </div>
+
+        {photoError && (
+          <p className="relative mt-4 rounded-lg border border-danger/20 bg-danger/10 px-3 py-2 text-xs text-danger">
+            {photoError}
+          </p>
+        )}
       </section>
 
       <section className="space-y-4">
