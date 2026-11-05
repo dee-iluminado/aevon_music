@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListMusic, Menu, Plus, Search, X } from "lucide-react";
+import { ListMusic, LogIn, LogOut, Menu, Plus, Search, UserPlus, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/logo";
 import { Footer } from "@/components/footer";
 import { PlaylistDialog } from "@/components/dialogs/playlist-dialog";
 import { useLibrary } from "@/stores/library-store";
 import { useMounted } from "@/hooks/use-mounted";
+import { AUTH_EVENT, accountInitial, clearAuth, getAuth } from "@/lib/auth";
+import type { AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -50,6 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [indicator, setIndicator] = useState({ left: 0, width: 0, opacity: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [prevPathname, setPrevPathname] = useState(pathname);
   const linkRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
   const navRef = useRef<HTMLDivElement>(null);
@@ -84,6 +87,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [measure]);
 
   useEffect(() => {
+    setUser(getAuth());
+    const onAuth = () => setUser(getAuth());
+    window.addEventListener(AUTH_EVENT, onAuth);
+    window.addEventListener("storage", onAuth);
+    return () => {
+      window.removeEventListener(AUTH_EVENT, onAuth);
+      window.removeEventListener("storage", onAuth);
+    };
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -93,6 +107,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [router]);
+
+  // Auth pages are their own full-screen shell; the site chrome would only
+  // fight with it.
+  const isAuthRoute = pathname === "/login" || pathname === "/signup";
+  if (isAuthRoute) return <>{children}</>;
 
   const navItems = NAV_ITEMS.map((item) => (
     <Link
@@ -166,6 +185,38 @@ export function AppShell({ children }: { children: ReactNode }) {
             >
               <Search className="h-4 w-4" />
             </button>
+
+            <span aria-hidden className="mx-1 h-5 w-px bg-line/60" />
+
+            {user ? (
+              <Link
+                href="/account"
+                aria-label="Your account"
+                title={`Signed in as ${user.name}`}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ember/15 text-[11px] font-semibold text-ember ring-1 ring-ember/25 transition-colors hover:bg-ember/25"
+              >
+                {accountInitial(user.name)}
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  aria-label="Sign in"
+                  title="Sign in"
+                  className={iconBtn}
+                >
+                  <LogIn className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/signup"
+                  aria-label="Sign up"
+                  title="Sign up"
+                  className={iconBtn}
+                >
+                  <UserPlus className="h-4 w-4" />
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile row */}
@@ -188,6 +239,23 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Search className="h-4 w-4" />
               </button>
+              {user ? (
+                <Link
+                  href="/account"
+                  aria-label="Your account"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ember/15 text-[11px] font-semibold text-ember ring-1 ring-ember/25 transition-colors hover:bg-ember/25"
+                >
+                  {accountInitial(user.name)}
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  aria-label="Sign in"
+                  className={iconBtn}
+                >
+                  <LogIn className="h-4 w-4" />
+                </Link>
+              )}
               <button
                 onClick={() => setMenuOpen((o) => !o)}
                 aria-label="Open menu"
@@ -212,6 +280,47 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {item.label}
               </Link>
             ))}
+            <div className="mx-4 my-1 border-t border-line" />
+            {user ? (
+              <>
+                <Link
+                  href="/account"
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg transition-colors hover:bg-fg/5"
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ember/15 text-[10px] font-semibold text-ember ring-1 ring-ember/25">
+                    {accountInitial(user.name)}
+                  </span>
+                  <span className="truncate">Your account</span>
+                </Link>
+                <button
+                  onClick={() => {
+                    clearAuth();
+                    setMenuOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sub transition-colors hover:bg-fg/5 hover:text-fg"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg transition-colors hover:bg-fg/5"
+                >
+                  <LogIn className="h-4 w-4 text-sub" />
+                  Sign in
+                </Link>
+                <Link
+                  href="/signup"
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-fg transition-colors hover:bg-fg/5"
+                >
+                  <UserPlus className="h-4 w-4 text-sub" />
+                  Create account
+                </Link>
+              </>
+            )}
             <div className="mx-4 my-1 border-t border-line" />
             <div className="px-4 pb-3 pt-2">
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dim">

@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Album, ArtistInfo, Song } from "@/lib/types";
+import { getAuth } from "@/lib/auth";
 import { isBlockedItem, withoutBlocked } from "@/lib/content-filter";
+import { LIBRARY_STORAGE_KEY, userScopedKey } from "@/lib/local-data";
 import { uid } from "@/lib/utils";
 
 export interface UserPlaylist {
@@ -156,8 +158,28 @@ export const useLibrary = create<LibraryState>()(
       isArtistFollowed: (id) => get().artists.some((a) => a.id === id),
     }),
     {
-      name: "hayasaka-library-v1",
-      storage: createJSONStorage(() => localStorage),
+      name: LIBRARY_STORAGE_KEY,
+      storage: createJSONStorage(() => ({
+        getItem: (name) => {
+          if (typeof window === "undefined") return null;
+          return window.localStorage.getItem(
+            userScopedKey(name, getAuth()?.email)
+          );
+        },
+        setItem: (name, value) => {
+          if (typeof window === "undefined") return;
+          window.localStorage.setItem(
+            userScopedKey(name, getAuth()?.email),
+            value
+          );
+        },
+        removeItem: (name) => {
+          if (typeof window === "undefined") return;
+          window.localStorage.removeItem(
+            userScopedKey(name, getAuth()?.email)
+          );
+        },
+      })),
       version: 3,
       migrate: (persisted, version) => {
         const state = (persisted ?? {}) as Partial<LibraryState>;
@@ -186,3 +208,37 @@ export const useLibrary = create<LibraryState>()(
     }
   )
 );
+
+const EMPTY_LIBRARY: Pick<
+  LibraryState,
+  | "favourites"
+  | "playlists"
+  | "downloads"
+  | "recentlyPlayed"
+  | "albums"
+  | "artists"
+  | "playCounts"
+> = {
+  favourites: [],
+  playlists: [],
+  downloads: [],
+  recentlyPlayed: [],
+  albums: [],
+  artists: [],
+  playCounts: {},
+};
+
+/**
+ * Swaps the in-memory library for the account that just signed in or out.
+ * When that account has no saved library yet we clear the previous one so
+ * another listener's data never lingers on screen.
+ */
+export async function rehydrateLibraryForUser(): Promise<void> {
+  if (typeof window === "undefined") return;
+  const key = userScopedKey(LIBRARY_STORAGE_KEY, getAuth()?.email);
+  if (window.localStorage.getItem(key) === null) {
+    useLibrary.setState(EMPTY_LIBRARY);
+    return;
+  }
+  await useLibrary.persist.rehydrate();
+}

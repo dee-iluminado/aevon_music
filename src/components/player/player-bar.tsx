@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   ListPlus,
   ListMusic,
@@ -29,6 +30,7 @@ import { useProgress } from "@/stores/progress-store";
 import { formatDuration, joinArtists, cn } from "@/lib/utils";
 
 export function PlayerBar() {
+  const pathname = usePathname();
   const song = usePlayer((s) => s.queue[s.currentIndex]);
   const isPlaying = usePlayer((s) => s.isPlaying);
   const repeat = usePlayer((s) => s.repeat);
@@ -56,6 +58,7 @@ export function PlayerBar() {
   const [npOpen, setNpOpen] = useState(false);
   const [scrub, setScrub] = useState<number | null>(null);
 
+  if (pathname === "/login" || pathname === "/signup") return null;
   if (!song) return null;
 
   const effectiveVolume = muted ? 0 : volume;

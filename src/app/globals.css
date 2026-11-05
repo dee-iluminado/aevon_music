@@ -452,10 +452,26 @@ input[type="range"].h-slider::-moz-range-thumb {
   cursor: pointer;
 }
 
+@keyframes auth-marquee {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.auth-marquee {
+  animation-name: auth-marquee;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mm-ember-dot,
   .mm-freshness-dot,
   .mm-dock-aurora,
+  .auth-marquee,
   .page-enter,
   .hero-dot-fill,
   .skeleton {

@@ -3,6 +3,7 @@ import { Playfair_Display, Space_Grotesk } from "next/font/google";
 import { Toaster } from "sonner";
 import { PlayerProvider } from "@/providers/player-provider";
 import { AppShell } from "@/components/app-shell";
+import { AuthSync } from "@/components/auth-sync";
 import { PlayerBar } from "@/components/player/player-bar";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import { OfflineBanner } from "@/components/offline-banner";
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-full">
         <PlayerProvider>
+          <AuthSync />
           <OfflineBanner />
           <AppShell>{children}</AppShell>
           <PlayerBar />
