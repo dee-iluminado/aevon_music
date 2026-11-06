@@ -55,6 +55,27 @@ export async function deezerSearchSongs(
   return (data?.data ?? []).map(toSong);
 }
 
+/**
+ * Deezer's search is much more forgiving with typos than the catalog. Return
+ * its best guess as a "Title Artist" query so the caller can retry the catalog
+ * with the corrected spelling.
+ */
+export async function deezerCorrectQuery(q: string): Promise<string | null> {
+  const data = await fetchJson<{ data?: DeezerTrack[] }>(
+    `/search?q=${encodeURIComponent(q)}&limit=5`
+  );
+  const top = data?.data?.[0];
+  /* Drop "(Remix)", "[Live]" and similar suffixes: the catalog search works
+     better with the plain song name. */
+  const title = top?.title
+    ?.replace(/[([][^)\]]*[)\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!title) return null;
+  const artist = top?.artist?.name?.trim();
+  return artist ? `${title} ${artist}` : title;
+}
+
 export async function deezerGetSong(id: string): Promise<Song | null> {
   const num = id.replace(/^dz-/, "");
   const track = await fetchJson<DeezerTrack>(`/track/${num}`);

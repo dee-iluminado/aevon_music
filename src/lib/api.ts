@@ -1,4 +1,4 @@
-import { deezerGetSong, deezerSearchSongs } from "./deezer";
+import { deezerCorrectQuery, deezerGetSong, deezerSearchSongs } from "./deezer";
 import {
   ALLOWED_MEDIA_HOSTS,
   SAAVN_BASE,
@@ -153,17 +153,48 @@ function imageSizes(raw: Raw | undefined): Record<string, string> {
   return map;
 }
 
+const ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&quot;": '"',
+  "&#039;": "'",
+  "&#39;": "'",
+  "&apos;": "'",
+  "&lt;": "<",
+  "&gt;": ">",
+};
+
+/** The catalog returns HTML-escaped names ("Vishal &amp; Shekhar"). */
+export function decodeEntities(value: string): string {
+  return value.replace(/&(?:amp|quot|#0?39|apos|lt|gt);/gi, (m) => {
+    return ENTITIES[m.toLowerCase()] ?? m;
+  });
+}
+
+function cleanName(value: unknown): string {
+  return decodeEntities(String(value ?? "")).trim();
+}
+
 function parseArtists(raw: Raw | undefined): string[] {
   const primary = (raw?.artists as { primary?: unknown } | undefined)?.primary;
   if (Array.isArray(primary)) {
     return primary
-      .map((a: { name?: unknown }) => String(a?.name ?? "").trim())
+      .map((a: { name?: unknown }) => cleanName(a?.name))
       .filter(Boolean);
   }
   const names = raw?.primary_artists;
-  if (Array.isArray(names)) return names.map(String).filter(Boolean);
-  if (typeof raw?.primary_artists === "string" && raw.primary_artists) {
-    return raw.primary_artists.split(/,\s*/).filter(Boolean);
+  if (Array.isArray(names)) return names.map(cleanName).filter(Boolean);
+  if (typeof names === "string" && names) {
+    return names.split(/,\s*/).map(cleanName).filter(Boolean);
+  }
+  // The combined search endpoint uses camelCase fields instead.
+  const camel = raw?.primaryArtists;
+  if (Array.isArray(camel)) return camel.map(cleanName).filter(Boolean);
+  if (typeof camel === "string" && camel) {
+    return camel.split(/,\s*/).map(cleanName).filter(Boolean);
+  }
+  const singers = raw?.singers;
+  if (typeof singers === "string" && singers) {
+    return singers.split(/,\s*/).map(cleanName).filter(Boolean);
   }
   return [];
 }
@@ -198,8 +229,8 @@ export function normalizeSong(raw: Raw | undefined): Song {
 
   return {
     id: String(raw?.id ?? raw?.encrypted_media_url ?? ""),
-    title: String(raw?.title ?? raw?.name ?? raw?.song ?? ""),
-    album: String(albumName),
+    title: cleanName(raw?.title ?? raw?.name ?? raw?.song),
+    album: cleanName(albumName),
     albumId: (raw?.album as { id?: string } | undefined)?.id
       ? String((raw?.album as { id?: string }).id)
       : undefined,
@@ -223,7 +254,7 @@ export function normalizeSong(raw: Raw | undefined): Song {
 export function normalizeAlbum(raw: Raw | undefined): Album {
   return {
     id: String(raw?.id ?? ""),
-    name: String(raw?.name ?? raw?.title ?? ""),
+    name: cleanName(raw?.name ?? raw?.title),
     image: pickImage(raw),
     imageSizes: imageSizes(raw),
     artists: parseArtists(raw),
@@ -232,7 +263,7 @@ export function normalizeAlbum(raw: Raw | undefined): Album {
     songCount: Number(
       raw?.songCount ?? (Array.isArray(raw?.songs) ? raw?.songs.length : 0)
     ),
-    description: raw?.description ? String(raw.description) : undefined,
+    description: raw?.description ? cleanName(raw.description) : undefined,
     url: raw?.url ? String(raw.url) : undefined,
     type: String(raw?.type ?? "album"),
     songs: Array.isArray(raw?.songs) ? raw.songs.map(normalizeSong) : undefined,
@@ -242,10 +273,10 @@ export function normalizeAlbum(raw: Raw | undefined): Album {
 export function normalizePlaylist(raw: Raw | undefined): Playlist {
   return {
     id: String(raw?.id ?? ""),
-    name: String(raw?.name ?? raw?.title ?? ""),
+    name: cleanName(raw?.name ?? raw?.title),
     image: pickImage(raw),
     imageSizes: imageSizes(raw),
-    subtitle: raw?.subtitle ? String(raw.subtitle) : undefined,
+    subtitle: raw?.subtitle ? cleanName(raw.subtitle) : undefined,
     songCount: Number(
       raw?.songCount ?? (Array.isArray(raw?.songs) ? raw?.songs.length : 0)
     ),
@@ -262,12 +293,144 @@ export function normalizePlaylist(raw: Raw | undefined): Playlist {
 export function normalizeArtist(raw: Raw | undefined): ArtistInfo {
   return {
     id: String(raw?.id ?? ""),
-    name: String(raw?.name ?? raw?.title ?? ""),
+    name: cleanName(raw?.name ?? raw?.title),
     image: pickImage(raw),
     imageSizes: imageSizes(raw),
     url: raw?.url ? String(raw.url) : undefined,
     type: String(raw?.type ?? "artist"),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Duplicate cleanup                                                   */
+/* ------------------------------------------------------------------ */
+
+function normalizeKey(value: string): string {
+  return decodeEntities(value)
+    .toLowerCase()
+    .replace(/[’'`]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Small Levenshtein helper used to recognise near-miss spellings. */
+function editDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > 3) return 4;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      row[j] = Math.min(
+        prev[j] + 1,
+        row[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Guard for typo corrections: the corrected spelling must share a real word
+ * with the query, or a word that is only a letter or two away. This lets
+ * "levitaitng" correct to "Levitating" while rejecting random guesses for
+ * gibberish like "qzxwvbnmkj".
+ */
+function sharesToken(a: string, b: string): boolean {
+  const words = normalizeKey(a)
+    .split(" ")
+    .filter((word) => word.length >= 3);
+  const candidates = normalizeKey(b)
+    .split(" ")
+    .filter((word) => word.length >= 3);
+
+  return words.some((word) =>
+    candidates.some((candidate) => {
+      if (word === candidate) return true;
+      const tolerance = Math.min(word.length, candidate.length) >= 6 ? 2 : 1;
+      return editDistance(word, candidate) <= tolerance;
+    })
+  );
+}
+
+function baseTitle(title: string): string {
+  return normalizeKey(title.replace(/\([^)]*\)/g, " "));
+}
+
+function durationClose(a: number, b: number): boolean {
+  // Unknown durations cannot be compared, so treat them as the same song.
+  if (!a || !b) return true;
+  return Math.abs(a - b) <= 4;
+}
+
+function songScore(song: Song): number {
+  let score = 0;
+  if (song.mediaUrl) score += 4;
+  if (song.downloadUrl.length) score += 2;
+  if (song.hasLyrics) score += 1;
+  score += Math.min(2, (song.playCount ?? 0) / 1_000_000);
+  return score;
+}
+
+/**
+ * Collapse copies of the same recording. The catalog (and its fallback
+ * providers) often return one song several times under different album ids;
+ * without this those copies fill the whole result list and hide genuinely
+ * different songs that happen to share a name.
+ *
+ * Songs with the same base title and artist are only merged when their
+ * durations are close, so remixes/live versions with different runtimes stay.
+ */
+export function dedupeSongs(songs: Song[]): Song[] {
+  const groups = new Map<string, Song[]>();
+  for (const song of songs) {
+    if (!song.id) continue;
+    const full = normalizeKey(song.title);
+    const base = baseTitle(song.title);
+    const artist = normalizeKey(song.artists[0] ?? "");
+    // With no title there is nothing safe to compare against.
+    const key = base ? `${base}|${artist}` : `id:${song.id}`;
+    const bucket = groups.get(key);
+    if (!bucket) {
+      groups.set(key, [song]);
+      continue;
+    }
+    const match = bucket.find((existing) => {
+      // Same exact title (even if the runtime differs by a few seconds) is the
+      // same recording listed under another album id.
+      if (normalizeKey(existing.title) === full) return true;
+      // A parenthetical suffix (remix/live/acoustic) only counts as the same
+      // song when the runtime matches too.
+      return durationClose(existing.duration, song.duration);
+    });
+    if (!match) {
+      bucket.push(song);
+    } else if (songScore(song) > songScore(match)) {
+      bucket[bucket.indexOf(match)] = song;
+    }
+  }
+  return [...groups.values()].flat();
+}
+
+function dedupeByName<T extends { id: string }>(
+  items: T[],
+  name: (item: T) => string,
+  artist?: (item: T) => string
+): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (!item.id) continue;
+    const key = `${normalizeKey(name(item))}|${
+      artist ? normalizeKey(artist(item)) : ""
+    }`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
 }
 
 export function extractList(data: unknown): Raw[] {
@@ -293,26 +456,65 @@ export async function searchSongs(
   limit = 20,
   opts: RequestOptions = {}
 ): Promise<Song[]> {
+  /* Ask for more than we show: the catalog repeats the same recording many
+     times, and deduping afterwards is what frees slots for other songs. */
+  const fetchLimit = 40;
   const data = await request(
     "/api/search/songs",
-    { query, page, limit },
+    { query, page, limit: fetchLimit },
     { noStore: true, ...opts }
   );
-  const songs = withoutBlocked(extractList(data).map(normalizeSong));
+  let songs = dedupeSongs(
+    withoutBlocked(extractList(data).map(normalizeSong))
+  );
 
-  if (page === 1 && songs.length < Math.min(limit, 8)) {
-    const extra = await deezerSearchSongs(query, 12);
-    const key = (s: Song) =>
-      `${s.title.toLowerCase()}|${(s.artists[0] ?? "").toLowerCase()}`;
-    const seen = new Set(songs.map(key));
-    const merged = [
-      ...songs,
-      ...extra.filter((d) => !seen.has(key(d))),
-    ];
-    return withoutBlocked(merged).slice(0, Math.max(limit, 24));
+  if (page !== 1) {
+    return songs.slice(0, Math.max(limit, 24));
   }
 
-  return songs;
+  /* Fewer than a screenful of results usually means the query was mistyped or
+     the catalog only returned variants. Both paths below are guarded so they
+     never replace good results. */
+  const minResults = Math.min(limit, 8);
+
+  if (songs.length < minResults) {
+    /* The catalog tolerates some typos but not all ("levitaitng dua lipa"
+       returns one live version). Ask Deezer for the canonical spelling, then
+       search the catalog again — this keeps full-length catalog tracks while
+       still recovering from misspellings. Only do this when the original
+       query is nearly empty, so a wrong guess can never outrank good
+       results. */
+    const corrected = await deezerCorrectQuery(query);
+    if (
+      corrected &&
+      sharesToken(query, corrected) &&
+      normalizeKey(corrected) !== normalizeKey(query)
+    ) {
+      try {
+        const retry = await request(
+          "/api/search/songs",
+          { query: corrected, page: 1, limit: fetchLimit },
+          { noStore: true, ...opts }
+        );
+        /* A broad retry can drag in other tracks from the same album or
+           artist. Only keep the ones whose title actually matches the
+           corrected name, then put them first. */
+        const matches = withoutBlocked(extractList(retry).map(normalizeSong))
+          .filter((song) => sharesToken(song.title, baseTitle(corrected)));
+        songs = dedupeSongs([...matches, ...songs]);
+      } catch {
+        // Keep the results we already have.
+      }
+    }
+  }
+
+  if (songs.length < 4) {
+    // Last resort: Deezer's short previews still let the user find the track.
+    const extra = await deezerSearchSongs(query, 12);
+    songs = dedupeSongs([...songs, ...withoutBlocked(extra)]);
+  }
+
+  return songs.slice(0, Math.max(limit, 24));
 }
 
 export async function getEnglishHomeSongs(limit = 20): Promise<Song[]> {
@@ -325,16 +527,7 @@ export async function getEnglishHomeSongs(limit = 20): Promise<Song[]> {
     )
   );
 
-  const byTitle = new Map<string, Song>();
-  for (const song of lists.flat()) {
-    const key = song.title.trim().toLowerCase();
-    const existing = byTitle.get(key);
-    if (!existing || (song.playCount ?? 0) > (existing.playCount ?? 0)) {
-      byTitle.set(key, song);
-    }
-  }
-
-  return [...byTitle.values()]
+  return dedupeSongs(lists.flat())
     .sort((a, b) => (b.playCount ?? 0) - (a.playCount ?? 0))
     .slice(0, limit);
 }
@@ -350,7 +543,11 @@ export async function searchAlbums(
     { query, page, limit },
     { noStore: true, ...opts }
   );
-  return withoutBlocked(extractList(data).map(normalizeAlbum));
+  return dedupeByName(
+    withoutBlocked(extractList(data).map(normalizeAlbum)),
+    (album) => album.name,
+    (album) => album.artists[0] ?? ""
+  );
 }
 
 export async function searchPlaylists(
@@ -364,7 +561,10 @@ export async function searchPlaylists(
     { query, page, limit },
     { noStore: true, ...opts }
   );
-  return withoutBlocked(extractList(data).map(normalizePlaylist));
+  return dedupeByName(
+    withoutBlocked(extractList(data).map(normalizePlaylist)),
+    (playlist) => playlist.name
+  );
 }
 
 export async function searchArtists(
@@ -378,7 +578,10 @@ export async function searchArtists(
     { query, page, limit },
     { noStore: true, ...opts }
   );
-  return extractList(data).map(normalizeArtist);
+  return dedupeByName(
+    extractList(data).map(normalizeArtist),
+    (artist) => artist.name
+  );
 }
 
 export interface SearchAll {
@@ -400,12 +603,22 @@ export async function searchAll(
   );
   const d = (data ?? {}) as Record<string, unknown>;
   return {
-    songs: withoutBlocked(extractList(d.songs ?? []).map(normalizeSong)),
-    albums: withoutBlocked(extractList(d.albums ?? []).map(normalizeAlbum)),
-    playlists: withoutBlocked(
-      extractList(d.playlists ?? []).map(normalizePlaylist)
+    songs: dedupeSongs(
+      withoutBlocked(extractList(d.songs ?? []).map(normalizeSong))
     ),
-    artists: extractList(d.artists ?? []).map(normalizeArtist),
+    albums: dedupeByName(
+      withoutBlocked(extractList(d.albums ?? []).map(normalizeAlbum)),
+      (album) => album.name,
+      (album) => album.artists[0] ?? ""
+    ),
+    playlists: dedupeByName(
+      withoutBlocked(extractList(d.playlists ?? []).map(normalizePlaylist)),
+      (playlist) => playlist.name
+    ),
+    artists: dedupeByName(
+      extractList(d.artists ?? []).map(normalizeArtist),
+      (artist) => artist.name
+    ),
   };
 }
 
@@ -480,7 +693,7 @@ export async function getArtistSongs(
       }
     }
   }
-  return all;
+  return dedupeSongs(all);
 }
 
 export async function getArtistAlbums(
@@ -506,7 +719,9 @@ export async function getSongSuggestions(
     { id, limit },
     { revalidate: 3600 }
   );
-  return withoutBlocked(extractList(data).map(normalizeSong));
+  return dedupeSongs(
+    withoutBlocked(extractList(data).map(normalizeSong))
+  );
 }
 
 export async function getLyrics(id: string): Promise<Lyrics | null> {
