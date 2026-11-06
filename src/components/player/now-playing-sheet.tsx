@@ -56,10 +56,14 @@ export function NowPlayingSheet({
   const isFav = mounted && !!song && favs.some((f) => f.id === song.id);
 
   const [view, setView] = useState<"player" | "lyrics">("player");
+  const [scrub, setScrub] = useState<number | null>(null);
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (!open) setView("player");
+    if (!open) {
+      setView("player");
+      setScrub(null);
+    }
   }
 
   useLockBody(open);
@@ -155,13 +159,17 @@ export function NowPlayingSheet({
 
             <div className="mt-6">
               <Slider
-                value={current}
+                value={scrub ?? current}
                 max={duration || 1}
-                onChange={(v) => st.getState().seekTo(v)}
+                onChange={(v) => setScrub(v)}
+                onCommit={(v) => {
+                  st.getState().seekTo(v);
+                  setScrub(null);
+                }}
                 ariaLabel="Seek"
               />
               <div className="mt-1.5 flex justify-between text-xs tabular-nums text-zinc-500">
-                <span>{formatDuration(current)}</span>
+                <span>{formatDuration(scrub ?? current)}</span>
                 <span>{formatDuration(duration)}</span>
               </div>
             </div>

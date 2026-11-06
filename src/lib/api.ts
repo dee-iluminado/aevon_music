@@ -342,12 +342,13 @@ export async function getEnglishHomeSongs(limit = 20): Promise<Song[]> {
 export async function searchAlbums(
   query: string,
   page = 1,
-  limit = 20
+  limit = 20,
+  opts: RequestOptions = {}
 ): Promise<Album[]> {
   const data = await request(
     "/api/search/albums",
     { query, page, limit },
-    { noStore: true }
+    { noStore: true, ...opts }
   );
   return withoutBlocked(extractList(data).map(normalizeAlbum));
 }
@@ -355,12 +356,13 @@ export async function searchAlbums(
 export async function searchPlaylists(
   query: string,
   page = 1,
-  limit = 20
+  limit = 20,
+  opts: RequestOptions = {}
 ): Promise<Playlist[]> {
   const data = await request(
     "/api/search/playlists",
     { query, page, limit },
-    { noStore: true }
+    { noStore: true, ...opts }
   );
   return withoutBlocked(extractList(data).map(normalizePlaylist));
 }
@@ -368,12 +370,13 @@ export async function searchPlaylists(
 export async function searchArtists(
   query: string,
   page = 1,
-  limit = 20
+  limit = 20,
+  opts: RequestOptions = {}
 ): Promise<ArtistInfo[]> {
   const data = await request(
     "/api/search/artists",
     { query, page, limit },
-    { noStore: true }
+    { noStore: true, ...opts }
   );
   return extractList(data).map(normalizeArtist);
 }
@@ -385,11 +388,15 @@ export interface SearchAll {
   artists: ArtistInfo[];
 }
 
-export async function searchAll(query: string, limit = 10): Promise<SearchAll> {
+export async function searchAll(
+  query: string,
+  limit = 10,
+  opts: RequestOptions = {}
+): Promise<SearchAll> {
   const data = await request(
     "/api/search",
     { query, limit },
-    { noStore: true }
+    { noStore: true, ...opts }
   );
   const d = (data ?? {}) as Record<string, unknown>;
   return {
@@ -407,7 +414,7 @@ export async function getSong(id: string): Promise<Song | null> {
     const song = await deezerGetSong(id);
     return song && !isBlockedLanguage(song.language) ? song : null;
   }
-  const data = await request<Raw | Raw[]>("/api/songs/{id}", { id });
+  const data = await request<Raw | Raw[]>("/api/songs/{id}", { id }, { revalidate: 3600 });
   const item = Array.isArray(data) ? data[0] : data;
   if (!item || typeof item !== "object") return null;
   const song = normalizeSong(item);
@@ -416,12 +423,12 @@ export async function getSong(id: string): Promise<Song | null> {
 
 export async function getSongs(ids: string[]): Promise<Song[]> {
   if (!ids.length) return [];
-  const data = await request("/api/songs", { ids: ids.join(",") }, { noStore: true });
+  const data = await request("/api/songs", { ids: ids.join(",") }, { revalidate: 3600 });
   return withoutBlocked(extractList(data).map(normalizeSong));
 }
 
 export async function getAlbum(id: string): Promise<Album | null> {
-  const data = await request<Raw>("/api/albums/{id}", { id });
+  const data = await request<Raw>("/api/albums/{id}", { id }, { revalidate: 3600 });
   if (!data || typeof data !== "object") return null;
   const album = normalizeAlbum(data);
   if (isBlockedLanguage(album.language)) return null;
@@ -432,7 +439,7 @@ export async function getAlbum(id: string): Promise<Album | null> {
 }
 
 export async function getPlaylist(id: string): Promise<Playlist | null> {
-  const data = await request<Raw>("/api/playlists/{id}", { id });
+  const data = await request<Raw>("/api/playlists/{id}", { id }, { revalidate: 3600 });
   if (!data || typeof data !== "object") return null;
   const playlist = normalizePlaylist(data);
   if (isBlockedLanguage(playlist.language)) return null;
@@ -443,7 +450,7 @@ export async function getPlaylist(id: string): Promise<Playlist | null> {
 }
 
 export async function getArtist(id: string): Promise<ArtistInfo | null> {
-  const data = await request<Raw>("/api/artists/{id}", { id });
+  const data = await request<Raw>("/api/artists/{id}", { id }, { revalidate: 3600 });
   return data && typeof data === "object" ? normalizeArtist(data) : null;
 }
 
@@ -460,7 +467,7 @@ export async function getArtistSongs(
       request(
         "/api/artists/{id}/songs",
         { id, page: page + i, category },
-        { noStore: true }
+        { revalidate: 3600 }
       )
     )
   );
@@ -486,7 +493,7 @@ export async function getArtistAlbums(
   // The primary provider returns an empty list when `page` is present for
   // some artists, so only send it when actually paginating.
   if (page > 1) params.page = page;
-  const data = await request("/api/artists/{id}/albums", { id, ...params }, { noStore: true });
+  const data = await request("/api/artists/{id}/albums", { id, ...params }, { revalidate: 3600 });
   return withoutBlocked(extractList(data).map(normalizeAlbum));
 }
 
@@ -497,13 +504,13 @@ export async function getSongSuggestions(
   const data = await request(
     "/api/songs/{id}/suggestions",
     { id, limit },
-    { noStore: true }
+    { revalidate: 3600 }
   );
   return withoutBlocked(extractList(data).map(normalizeSong));
 }
 
 export async function getLyrics(id: string): Promise<Lyrics | null> {
-  const data = await request<Raw>("/api/lyrics/{id}", { id }, { noStore: true });
+  const data = await request<Raw>("/api/lyrics/{id}", { id }, { revalidate: 3600 });
   if (!data || typeof data !== "object") return null;
   return {
     id: String(data.id ?? id),

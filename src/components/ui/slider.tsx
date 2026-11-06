@@ -37,7 +37,10 @@ export function Slider({
     if (!["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp"].includes(e.key)) return;
     e.preventDefault();
     const dir = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 1;
-    const next = Math.min(safeMax, Math.max(0, value + dir * keyStep));
+    // Use the live DOM value so holding an arrow key advances correctly even
+    // before the controlled prop has re-rendered.
+    const base = Number(inputRef.current?.value ?? value);
+    const next = Math.min(safeMax, Math.max(0, base + dir * keyStep));
     onChange(next);
     onCommit?.(next);
   };
@@ -65,6 +68,7 @@ export function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         onPointerDown={() => (dragging.current = true)}
         onPointerUp={commitDrag}
+        onLostPointerCapture={commitDrag}
         onPointerCancel={() => (dragging.current = false)}
         onKeyDown={handleKey}
         className="h-slider absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"

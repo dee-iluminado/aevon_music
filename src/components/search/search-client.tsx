@@ -62,6 +62,10 @@ export function SearchClient() {
     tab: urlTab,
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  /* Results we already fetched this session. Revisiting a query or flipping
+     between tabs then feels instant instead of waiting on the slow catalog
+     API again. */
+  const cacheRef = useRef<Map<string, Results>>(new Map());
   /* URLs we wrote ourselves while typing. When useSearchParams catches up we
      must not copy that stale value back into the input — that is what used to
      eat characters mid-word. */
@@ -104,6 +108,12 @@ export function SearchClient() {
 
   useEffect(() => {
     if (!debounced) return;
+    const key = `${debounced}|${tab}`;
+    const cached = cacheRef.current.get(key);
+    if (cached) {
+      setState({ q: debounced, tab, results: cached, error: false });
+      return;
+    }
     let cancelled = false;
     fetch(`/api/search?q=${encodeURIComponent(debounced)}&type=${tab}`)
       .then((res) => {
@@ -112,6 +122,11 @@ export function SearchClient() {
       })
       .then((data) => {
         if (!cancelled) {
+          if (cacheRef.current.size > 60) {
+            const oldest = cacheRef.current.keys().next().value;
+            if (oldest) cacheRef.current.delete(oldest);
+          }
+          cacheRef.current.set(key, data);
           setState({ q: debounced, tab, results: data, error: false });
           const count = Object.values(data as Results).reduce(
             (total, list) => total + (Array.isArray(list) ? list.length : 0),
@@ -126,7 +141,7 @@ export function SearchClient() {
     return () => {
       cancelled = true;
     };
-  }, [debounced, tab]);
+  }, [debounced, tab, addRecent]);
 
   const loading = !!debounced && (state?.q !== debounced || state?.tab !== tab);
   const error = !loading && !!state && state.error === true;

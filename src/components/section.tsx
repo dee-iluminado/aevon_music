@@ -64,7 +64,7 @@ export function Section({ title, subtitle, href, children }: SectionProps) {
 
       <div
         ref={scroller}
-        className="hide-scrollbar -mx-4 flex snap-x gap-5 overflow-x-auto overscroll-x-contain px-4 pb-3 sm:-mx-6 sm:px-6 lg:-mx-12 lg:px-12"
+        className="hide-scrollbar -mx-4 flex snap-x scroll-pl-4 gap-5 overflow-x-auto overscroll-x-contain px-4 pb-3 sm:-mx-6 sm:scroll-pl-6 sm:px-6 lg:-mx-12 lg:scroll-pl-12 lg:px-12"
       >
         {children}
       </div>

@@ -34,6 +34,7 @@ async function fetchJson<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(`${DEEZER_API}${path}`, {
       signal: AbortSignal.timeout(15000),
+      next: { revalidate: 3600 },
     });
     if (!res.ok) return null;
     const json = (await res.json()) as T | { error?: unknown };

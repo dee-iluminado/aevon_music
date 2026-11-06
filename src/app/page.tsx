@@ -26,9 +26,9 @@ export const revalidate = 3600;
 export default async function HomePage() {
   const [songs, albums, playlists] = await Promise.all([
     safe(getEnglishHomeSongs(14), []),
-    safe(searchAlbums("english", 1, 24), [])
+    safe(searchAlbums("english", 1, 24, { revalidate: 3600 }), [])
       .then((list) => list.filter((a) => a.language === "english")),
-    safe(searchPlaylists("english", 1, 24), [])
+    safe(searchPlaylists("english", 1, 24, { revalidate: 3600 }), [])
       .then((list) => list.filter((p) => p.language === "english")),
   ]);
 

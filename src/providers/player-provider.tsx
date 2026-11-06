@@ -89,6 +89,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Seeking can finish between two `timeupdate` ticks. Reading the element
+    // here keeps the timer/thumbnail in sync with the audio right away.
+    const handleSeeked = () => {
+      const d = isFinite(audio.duration)
+        ? audio.duration
+        : useProgress.getState().duration;
+      const b =
+        audio.buffered.length > 0
+          ? audio.buffered.end(audio.buffered.length - 1)
+          : 0;
+      useProgress.getState().setProgress(audio.currentTime, d, b);
+      syncPlaybackPosition(audio.currentTime, d);
+      persistPosition();
+    };
+
     const handleLoadedMetadata = () => {
       const d = isFinite(audio.duration) ? audio.duration : 0;
       const st = usePlayer.getState();
@@ -136,6 +151,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     audio.addEventListener("play", handlePlay);
     audio.addEventListener("pause", handlePause);
     audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("seeked", handleSeeked);
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("durationchange", handleTimeUpdate);
     audio.addEventListener("ended", handleEnded);
@@ -147,6 +163,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("seeked", handleSeeked);
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
       audio.removeEventListener("durationchange", handleTimeUpdate);
       audio.removeEventListener("ended", handleEnded);

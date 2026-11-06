@@ -269,7 +269,30 @@ export const usePlayer = create<PlayerState>()(
 
   seekTo: (time) => {
     const audio = getAudio();
-    if (audio && isFinite(time)) audio.currentTime = time;
+    if (!audio || !isFinite(time)) return;
+    const progress = useProgress.getState();
+    const d =
+      isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : progress.duration;
+    const target = Math.max(0, Math.min(time, d > 0 ? d : time));
+    try {
+      audio.currentTime = target;
+    } catch {
+      // Metadata may not be loaded yet; the next timeupdate will catch up.
+      return;
+    }
+    const buffered =
+      audio.buffered.length > 0
+        ? audio.buffered.end(audio.buffered.length - 1)
+        : progress.buffered;
+    // Reflect the new position immediately. `timeupdate` only fires ~4x a
+    // second and `seeked` can arrive late, which used to leave the timer stuck
+    // on the old position after seeking.
+    progress.setProgress(target, d, buffered);
+    const state = get();
+    const song = state.queue[state.currentIndex];
+    if (song) set({ position: target, positionId: song.id });
   },
 
   setVolume: (volume) => {

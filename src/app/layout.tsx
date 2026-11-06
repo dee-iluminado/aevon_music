@@ -76,6 +76,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`dark ${playfair.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
+      <head>
+        {/* Album art and audio come from the same CDNs on every page; opening
+            the connections early removes a DNS/TLS round-trip per request. */}
+        <link rel="preconnect" href="https://c.saavncdn.com" crossOrigin="" />
+        <link rel="preconnect" href="https://aac.saavncdn.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://c.saavncdn.com" />
+        <link rel="dns-prefetch" href="https://aac.saavncdn.com" />
+      </head>
       <body className="min-h-full">
         <PlayerProvider>
           <AuthSync />

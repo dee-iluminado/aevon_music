@@ -63,7 +63,7 @@ const TILE =
 export default async function BrowsePage() {
   const lists = await Promise.all(
     ["chill", "lofi", "jazz", "acoustic", "workout", "sleep"].map((query) =>
-      safe(searchPlaylists(query, 1, 10), [])
+      safe(searchPlaylists(query, 1, 10, { revalidate: 3600 }), [])
     )
   );
 

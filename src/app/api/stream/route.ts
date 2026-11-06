@@ -35,7 +35,16 @@ export async function GET(req: NextRequest) {
     const contentRange = upstream.headers.get("content-range");
     if (contentLength) resHeaders.set("Content-Length", contentLength);
     if (contentRange) resHeaders.set("Content-Range", contentRange);
-    resHeaders.set("Cache-Control", "public, max-age=86400");
+    // Never let a CDN cache a partial response under the bare URL: a cached
+    // 206 can be served for a different Range and make seeking jump to the
+    // wrong place. Full responses are safe to cache for a day.
+    resHeaders.set("Vary", "Range");
+    resHeaders.set(
+      "Cache-Control",
+      upstream.status === 206
+        ? "private, no-store"
+        : "public, max-age=86400"
+    );
 
     return new Response(upstream.body, {
       status: upstream.status,
