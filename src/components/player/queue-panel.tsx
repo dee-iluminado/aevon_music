@@ -199,7 +199,7 @@ export function QueuePanel() {
                               e.stopPropagation();
                               removeAt(i);
                             }}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-600 opacity-0 transition hover:text-white group-hover:opacity-100"
+                            className="mm-hover-reveal flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-600 opacity-0 transition hover:text-white group-hover:opacity-100"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

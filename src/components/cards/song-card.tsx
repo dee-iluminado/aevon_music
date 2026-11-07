@@ -45,7 +45,7 @@ export function SongCard({ song, context }: SongCardProps) {
             {song.album || joinArtists(song.artists)}
           </p>
         </Link>
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <div className="flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
           <FavButton song={song} />
           <SongMenu song={song} context={context} size="sm" />
         </div>

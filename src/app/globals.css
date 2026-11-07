@@ -467,6 +467,56 @@ input[type="range"].h-slider::-moz-range-thumb {
   animation-iteration-count: infinite;
 }
 
+/* ── mobile shell (bottom nav + dock) ───────────────────── */
+:root {
+  --mm-mobile-nav-h: 60px;
+}
+
+/* The dock sits on top of the mobile tab bar, never underneath it. */
+.mm-player-dock {
+  bottom: calc(var(--mm-mobile-nav-h) + env(safe-area-inset-bottom));
+}
+
+.mm-header-safe {
+  padding-top: calc(1rem + env(safe-area-inset-top));
+}
+
+.mm-page-bottom {
+  padding-bottom: calc(9rem + env(safe-area-inset-bottom));
+}
+
+.mm-footer-safe {
+  padding-bottom: calc(8rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .mm-player-dock {
+    bottom: 0;
+  }
+  .mm-page-bottom {
+    padding-bottom: 7rem;
+  }
+  .mm-footer-safe {
+    padding-bottom: 0;
+  }
+}
+
+/* iOS zooms any focused form control under 16px, which wrecks the layout. */
+@media (max-width: 767px) {
+  input:not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Touch screens cannot hover, so hover-only actions stay visible. */
+@media (hover: none) {
+  .mm-hover-reveal {
+    opacity: 1 !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mm-ember-dot,
   .mm-freshness-dot,

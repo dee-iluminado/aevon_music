@@ -67,7 +67,7 @@ export function PlayerBar() {
 
   return (
     <>
-      <div className="fixed inset-x-0 bottom-0 z-40" data-player-surface>
+      <div className="mm-player-dock fixed inset-x-0 z-40" data-player-surface>
         <div className="relative overflow-hidden border-t border-line/80 mm-glass-dock">
           <div
             className="mm-dock-aurora pointer-events-none absolute inset-0"

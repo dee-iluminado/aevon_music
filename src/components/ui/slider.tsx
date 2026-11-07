@@ -80,7 +80,7 @@ export function Slider({
         />
         <div
           className={cn(
-            "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent opacity-0 shadow-[0_0_10px_rgb(var(--ember-rgb)/.6)] transition-opacity group-hover:opacity-100",
+            "mm-hover-reveal absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent opacity-0 shadow-[0_0_10px_rgb(var(--ember-rgb)/.6)] transition-opacity group-hover:opacity-100",
             thumbClassName
           )}
           style={{ left: `${pct}%` }}

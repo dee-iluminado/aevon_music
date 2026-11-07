@@ -76,7 +76,7 @@ export function AuthWall({ children }: { children: React.ReactNode }) {
       <Link
         href="/"
         aria-label="Close"
-        className="absolute left-4 top-5 z-20 text-white/50 transition-colors hover:text-white md:left-8 md:top-11"
+        className="absolute left-4 top-[calc(1.25rem+env(safe-area-inset-top))] z-20 text-white/50 transition-colors hover:text-white md:left-8 md:top-11"
       >
         <X className="h-6 w-6" />
       </Link>

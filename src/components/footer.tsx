@@ -22,8 +22,8 @@ const columns = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-line/60">
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-10 px-6 py-14 lg:flex-row lg:items-start lg:justify-between lg:px-12">
+    <footer className="mm-footer-safe border-t border-line/60">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-10 px-4 py-14 sm:px-6 lg:flex-row lg:items-start lg:justify-between lg:px-12">
         <div className="max-w-sm">
           <Logo />
           <p className="mt-3 text-sm leading-relaxed text-sub">
@@ -32,7 +32,7 @@ export function Footer() {
           </p>
         </div>
 
-        <div className="flex gap-14">
+        <div className="flex gap-10 sm:gap-14">
           {columns.map((col) => (
             <div key={col.title}>
               <h3 className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub">
@@ -55,7 +55,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-line/60 py-5">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 lg:px-12">
+        <div className="mx-auto flex max-w-[1600px] flex-col items-center gap-2 px-4 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left lg:px-12">
           <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sub/70">
             © {new Date().getFullYear()} {APP_NAME} · Powered by the public
             JioSaavn API. Not affiliated.

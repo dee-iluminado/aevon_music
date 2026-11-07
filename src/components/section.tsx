@@ -40,7 +40,7 @@ export function Section({ title, subtitle, href, children }: SectionProps) {
             )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="hidden shrink-0 items-center gap-1 sm:flex">
           <button
             onClick={() => scrollBy(-1)}
             aria-label="Previous"

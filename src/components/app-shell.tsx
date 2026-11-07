@@ -3,7 +3,20 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ListMusic, LogIn, LogOut, Menu, Plus, Search, UserPlus, X } from "lucide-react";
+import {
+  Compass,
+  Download,
+  Heart,
+  Home,
+  ListMusic,
+  LogIn,
+  LogOut,
+  Menu,
+  Plus,
+  Search,
+  UserPlus,
+  X,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { Logo } from "@/components/logo";
 import { UserAvatar } from "@/components/user-avatar";
@@ -38,6 +51,45 @@ const NAV_ITEMS = [
     key: "downloads",
     label: "Downloads",
     href: "/downloads",
+    match: (p: string) => p.startsWith("/downloads"),
+  },
+] as const;
+
+/* Phone tab bar — mirrors the Instagram-style layout the native app uses. */
+const MOBILE_NAV = [
+  {
+    key: "home",
+    label: "Home",
+    href: "/",
+    icon: Home,
+    match: (p: string) => p === "/",
+  },
+  {
+    key: "browse",
+    label: "Browse",
+    href: "/browse",
+    icon: Compass,
+    match: (p: string) => p.startsWith("/browse"),
+  },
+  {
+    key: "search",
+    label: "Search",
+    href: "/search",
+    icon: Search,
+    match: (p: string) => p.startsWith("/search"),
+  },
+  {
+    key: "library",
+    label: "Favourites",
+    href: "/library",
+    icon: Heart,
+    match: (p: string) => p.startsWith("/library"),
+  },
+  {
+    key: "downloads",
+    label: "Downloads",
+    href: "/downloads",
+    icon: Download,
     match: (p: string) => p.startsWith("/downloads"),
   },
 ] as const;
@@ -136,7 +188,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative min-h-screen bg-bg">
-      <header className="sticky top-0 z-40 px-4 pb-2 pt-4 sm:px-6 lg:px-8">
+      <header className="mm-header-safe sticky top-0 z-40 px-4 pb-2 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-[1600px] items-center justify-center">
           {/* Desktop pill */}
           <div className="mm-glass-pill hidden items-center gap-1 rounded-full p-1 pl-2 md:flex">
@@ -236,13 +288,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className={iconBtn}
               >
                 <Plus className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => router.push("/search")}
-                aria-label="Open search"
-                className={iconBtn}
-              >
-                <Search className="h-4 w-4" />
               </button>
               {user ? (
                 <Link
@@ -362,12 +407,50 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="relative">
-        <div className="mx-auto w-full max-w-[1600px] px-4 pb-36 pt-2 sm:px-6 lg:px-12 lg:pb-28">
+        <div className="mm-page-bottom mx-auto w-full max-w-[1600px] px-4 pt-2 sm:px-6 lg:px-12">
           {children}
         </div>
       </main>
 
       <Footer />
+
+      {/* Mobile tab bar */}
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line/80 bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+      >
+        <div className="mx-auto flex h-[var(--mm-mobile-nav-h)] max-w-md items-stretch">
+          {MOBILE_NAV.map((item) => {
+            const active = item.match(pathname);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors",
+                  active ? "text-fg" : "text-sub"
+                )}
+              >
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute top-0 h-0.5 w-7 rounded-full bg-accent"
+                  />
+                )}
+                <Icon
+                  className={cn("h-[21px] w-[21px]", active && "text-accent")}
+                  strokeWidth={active ? 2.3 : 1.9}
+                />
+                <span className="font-mono text-[10px] leading-none tracking-wide">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
 
       <PlaylistDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
     </div>
