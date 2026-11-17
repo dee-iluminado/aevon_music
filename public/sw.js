@@ -6,7 +6,7 @@
  *  - page navigations                                 -> network-first, cached copy offline
  *  - /api/*, audio streams, Range requests, cross-origin -> always network
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `aevon-shell-${VERSION}`;
 const STATIC_CACHE = `aevon-static-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
@@ -101,12 +101,19 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       (async () => {
         const cache = await caches.open(STATIC_CACHE);
-        const cached = await cache.match(request);
-        if (cached) return cached;
-
-        const response = await fetch(request);
-        if (response.ok) cache.put(request, response.clone());
-        return response;
+        try {
+          // Network-first. The build reuses chunk filenames between deploys,
+          // so serving from cache first kept old JavaScript (and old bugs)
+          // alive until the cache version was bumped. The browser's HTTP cache
+          // still makes these hashed assets cheap to revalidate.
+          const response = await fetch(request);
+          if (response.ok) cache.put(request, response.clone());
+          return response;
+        } catch {
+          const cached = await cache.match(request);
+          if (cached) return cached;
+          throw new Error("offline");
+        }
       })()
     );
   }

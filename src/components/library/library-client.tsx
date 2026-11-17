@@ -1,25 +1,127 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Disc3, Heart, ListMusic, Mic2, Plus, Clock } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  Clock,
+  Disc3,
+  Download,
+  Heart,
+  ListMusic,
+  Mic2,
+  Plus,
+  Upload,
+} from "lucide-react";
 import { Cover } from "@/components/cover";
 import { SongRow } from "@/components/song-row";
 import { PlaylistDialog } from "@/components/dialogs/playlist-dialog";
-import { useLibrary } from "@/stores/library-store";
+import { Button } from "@/components/ui/button";
+import { useLibrary, type UserPlaylist } from "@/stores/library-store";
 import { useMounted } from "@/hooks/use-mounted";
+import {
+  countBackupSongs,
+  createBackup,
+  describeMerge,
+  downloadBackup,
+  mergeLibrary,
+  parseBackup,
+  type LibraryData,
+} from "@/lib/library-backup";
 import { formatDuration } from "@/lib/utils";
-import type { Song } from "@/lib/types";
+import type { Album, ArtistInfo, Song } from "@/lib/types";
+
+type Notice = { kind: "ok" | "error"; text: string };
+
+/* Stable empties so the prerendered page and the first client render match. */
+const EMPTY_SONGS: Song[] = [];
+const EMPTY_PLAYLISTS: UserPlaylist[] = [];
+const EMPTY_ALBUMS: Album[] = [];
+const EMPTY_ARTISTS: ArtistInfo[] = [];
+const EMPTY_COUNTS: Record<string, number> = {};
 
 export function LibraryClient() {
   const mounted = useMounted();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const favourites = useLibrary((s) => s.favourites);
-  const playlists = useLibrary((s) => s.playlists);
-  const recent = useLibrary((s) => s.recentlyPlayed);
-  const albums = useLibrary((s) => s.albums);
-  const artists = useLibrary((s) => s.artists);
-  const playCounts = useLibrary((s) => s.playCounts);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const storedFavourites = useLibrary((s) => s.favourites);
+  const storedPlaylists = useLibrary((s) => s.playlists);
+  const storedDownloads = useLibrary((s) => s.downloads);
+  const storedRecent = useLibrary((s) => s.recentlyPlayed);
+  const storedAlbums = useLibrary((s) => s.albums);
+  const storedArtists = useLibrary((s) => s.artists);
+  const storedPlayCounts = useLibrary((s) => s.playCounts);
+
+  /*
+   * The page is prerendered before the browser has any saved library, so the
+   * first paint has to show the same empty state on the server and in the
+   * browser. Rendering `null` until mount used to leave /library blank on a
+   * cold load (the prerendered page segment was empty), so the shell always
+   * renders and the saved data appears on the frame after hydration.
+   */
+  const favourites = mounted ? storedFavourites : EMPTY_SONGS;
+  const playlists = mounted ? storedPlaylists : EMPTY_PLAYLISTS;
+  const recent = mounted ? storedRecent : EMPTY_SONGS;
+  const albums = mounted ? storedAlbums : EMPTY_ALBUMS;
+  const artists = mounted ? storedArtists : EMPTY_ARTISTS;
+  const playCounts = mounted ? storedPlayCounts : EMPTY_COUNTS;
+
+  function currentLibrary(): LibraryData {
+    return {
+      favourites: storedFavourites,
+      playlists: storedPlaylists,
+      downloads: storedDownloads,
+      recentlyPlayed: storedRecent,
+      albums: storedAlbums,
+      artists: storedArtists,
+      playCounts: storedPlayCounts,
+    };
+  }
+
+  function handleExport() {
+    const backup = createBackup(currentLibrary());
+    const filename = downloadBackup(backup);
+    setNotice({
+      kind: "ok",
+      text: `Backup saved as ${filename}.`,
+    });
+  }
+
+  async function handleImport(file: File) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const backup = parseBackup(await file.text());
+      const { data, added } = mergeLibrary(currentLibrary(), backup.data);
+      useLibrary.setState(data);
+
+      const summary = describeMerge(added);
+      const total = countBackupSongs(backup);
+      setNotice({
+        kind: "ok",
+        text: summary
+          ? `Imported ${summary}.`
+          : total === 0
+            ? "That backup is empty — nothing to import."
+            : `Nothing new — all ${total} songs from that file are already in your library.`,
+      });
+    } catch (error) {
+      setNotice({
+        kind: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Could not read that backup file.",
+      });
+    } finally {
+      setBusy(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
 
   const stats = useMemo(() => {
     const byId = new Map<string, Song>();
@@ -44,10 +146,65 @@ export function LibraryClient() {
     };
   }, [favourites, recent, playlists, playCounts]);
 
-  if (!mounted) return null;
-
   return (
     <div className="space-y-10">
+      <section className="rounded-2xl border border-line/70 bg-panel/60 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="font-heading text-lg font-semibold text-fg sm:text-xl">
+              Move your library
+            </h2>
+            <p className="mt-1 text-xs text-sub sm:text-sm">
+              Save your favourites, playlists and history as a JSON file, then
+              import it on another device. Downloads copy across as entries only
+              — the audio itself stays streamed.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={handleExport}>
+              <Download className="h-4 w-4" />
+              Export JSON
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInput.current?.click()}
+              disabled={busy}
+            >
+              <Upload className="h-4 w-4" />
+              {busy ? "Importing…" : "Import JSON"}
+            </Button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleImport(file);
+              }}
+            />
+          </div>
+        </div>
+        {notice && (
+          <p
+            role="status"
+            className={`mt-4 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-xs sm:text-sm ${
+              notice.kind === "ok"
+                ? "border-success/25 bg-success/10 text-success"
+                : "border-danger/30 bg-danger/10 text-danger"
+            }`}
+          >
+            {notice.kind === "ok" ? (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : (
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
+            <span className="min-w-0 break-words">{notice.text}</span>
+          </p>
+        )}
+      </section>
+
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 font-heading text-xl font-semibold text-fg sm:text-2xl">
